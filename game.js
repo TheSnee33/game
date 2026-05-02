@@ -45,9 +45,13 @@ const keys = {};
 window.addEventListener('keydown', (e) => { 
     keys[e.key] = true; 
     
-    // Shop manual open
-    if (e.key === 'Enter' && isPlaying && !isShopOpen) {
-        openShop();
+    // Shop manual open/close
+    if (e.key === 'Enter' && isPlaying) {
+        if (!isShopOpen) {
+            openShop();
+        } else {
+            closeShop();
+        }
     }
 });
 window.addEventListener('keyup', (e) => { keys[e.key] = false; });
@@ -383,12 +387,14 @@ tabSkins.addEventListener('click', () => {
     tabSkins.classList.add('active'); tabWeapons.classList.remove('active');
     shopSkins.classList.add('active'); shopWeapons.classList.remove('active');
 });
-resumeBtn.addEventListener('click', () => {
+function closeShop() {
     isShopOpen = false;
     shopMenu.classList.add('hidden');
     lastTime = performance.now();
     requestAnimationFrame(gameLoop);
-});
+}
+
+resumeBtn.addEventListener('click', closeShop);
 
 function openShop() {
     isShopOpen = true;
