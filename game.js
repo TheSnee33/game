@@ -63,6 +63,46 @@ function resizeCanvas() {
 }
 resizeCanvas();
 
+// --- Audio ---
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+function playSound(type) {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const osc = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    osc.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    const now = audioCtx.currentTime;
+
+    if (type === 'gun' || type === 'sniper' || type === 'shotgun') {
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(150, now);
+        osc.frequency.exponentialRampToValueAtTime(0.01, now + 0.1);
+        gainNode.gain.setValueAtTime(0.05, now);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+        osc.start(now); osc.stop(now + 0.1);
+    } else if (type === 'staff') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(400, now);
+        osc.frequency.linearRampToValueAtTime(600, now + 0.2);
+        gainNode.gain.setValueAtTime(0.05, now);
+        gainNode.gain.linearRampToValueAtTime(0.01, now + 0.2);
+        osc.start(now); osc.stop(now + 0.2);
+    } else if (type === 'laser') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(800, now);
+        gainNode.gain.setValueAtTime(0.02, now);
+        gainNode.gain.linearRampToValueAtTime(0.01, now + 0.1);
+        osc.start(now); osc.stop(now + 0.1);
+    } else if (type === 'rocket') {
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(50, now);
+        osc.frequency.linearRampToValueAtTime(20, now + 0.3);
+        gainNode.gain.setValueAtTime(0.1, now);
+        gainNode.gain.linearRampToValueAtTime(0.01, now + 0.3);
+        osc.start(now); osc.stop(now + 0.3);
+    }
+}
+
 // --- Data ---
 const WEAPONS = [
     { id: 'gun', name: 'Gun', icon: '🔫', baseCost: 50 },
@@ -117,7 +157,8 @@ const AVATAR_ABILITIES = {
     'fairy': { name: 'Fairy Dust', desc: 'Starts with Orbs Lv.3', effect: (p) => p.weapons.orbs = 3, onLevelUp: (p) => p.weapons.orbs++ },
     'genie': { name: 'Wish', desc: 'Starts with 1 level in EVERY weapon', effect: (p) => { for(let w in p.weapons) p.weapons[w]=1; }, onLevelUp: (p) => { const w = Object.keys(p.weapons); p.weapons[w[Math.floor(Math.random() * w.length)]]++; } },
     'villain': { name: 'Villain', desc: 'Starts with Poison & Lightning Lv.3', effect: (p) => { p.weapons.poison=3; p.weapons.lightning=3; }, onLevelUp: (p) => { p.weapons.poison++; p.weapons.lightning++; } },
-    'lindsey': { name: 'Ultimate Survival (Dev AI)', desc: 'Starts with +50 Armor and all Weapons Lv.3', effect: (p) => { p.hp += 50; for(let w in p.weapons) p.weapons[w]=3; }, onLevelUp: (p) => { p.hp += 10; p.speed += 20; p.lifesteal += 0.05; for(let w in p.weapons) p.weapons[w]++; } }
+    'lindsey': { name: 'Ultimate Survival (Dev AI)', desc: 'Starts with +50 Armor and all Weapons Lv.3', effect: (p) => { p.hp += 50; for(let w in p.weapons) p.weapons[w]=3; }, onLevelUp: (p) => { p.hp += 10; p.speed += 20; p.lifesteal += 0.05; for(let w in p.weapons) p.weapons[w]++; } },
+    'bob': { name: 'Bob (Tester)', desc: 'Extremely Powerful. All Weapons Lv.5', effect: (p) => { p.hp += 200; p.speed *= 2; for(let w in p.weapons) p.weapons[w]=5; }, onLevelUp: (p) => { p.hp += 20; for(let w in p.weapons) p.weapons[w]++; } }
 };
 
 const BIOMES = [
@@ -135,6 +176,10 @@ let projectiles = [];
 let poisons = [];
 let obstacles = [];
 let currentBiomeIndex = 0;
+let targetBiomeIndex = 0;
+let transitionPhase = 0; // 0=none, 1=fade to black, 2=fade from black
+let transitionAlpha = 0;
+let difficultyMult = 1.0;
 
 // Unlocked skins
 let unlockedSkins = JSON.parse(localStorage.getItem('unlockedSkins') || '{}');
@@ -167,13 +212,23 @@ function initMenu() {
 
 function injectLindseyAvatar() {
     if (document.querySelector('.avatar-btn[data-id="lindsey"]')) return;
-    const btn = document.createElement('button');
-    btn.className = 'avatar-btn';
-    btn.innerHTML = '<img src="lindsey.png" style="width:100%;height:100%;border-radius:5px;object-fit:cover;">';
-    btn.dataset.id = 'lindsey';
-    btn.dataset.unlocked = "true";
-    btn.dataset.type = 'image';
-    avatarSelectionContainer.appendChild(btn);
+    
+    const lBtn = document.createElement('button');
+    lBtn.className = 'avatar-btn';
+    lBtn.innerHTML = '<img src="lindsey.png" style="width:100%;height:100%;border-radius:5px;object-fit:cover;">';
+    lBtn.dataset.id = 'lindsey';
+    lBtn.dataset.unlocked = "true";
+    lBtn.dataset.type = 'image';
+    avatarSelectionContainer.appendChild(lBtn);
+
+    const bBtn = document.createElement('button');
+    bBtn.className = 'avatar-btn';
+    bBtn.innerHTML = '👨‍🔧';
+    bBtn.dataset.id = 'bob';
+    bBtn.dataset.unlocked = "true";
+    bBtn.dataset.type = 'emoji';
+    avatarSelectionContainer.appendChild(bBtn);
+
     updateTooltips();
     setupAvatarSelection();
 }
@@ -189,14 +244,15 @@ function updateTooltips() {
 }
 
 secretDevBtn.addEventListener('click', () => {
-    if (unlockedSkins['lindsey']) {
-        alert("Dev testing avatar already unlocked.");
+    if (unlockedSkins['lindsey'] && unlockedSkins['bob']) {
+        alert("Dev testing avatars already unlocked.");
         return;
     }
     const pwd = prompt("Enter Dev Password:");
     if (pwd === "admin") {
-        alert("Dev Testing Avatar Unlocked!");
+        alert("Dev Testing Avatars Unlocked: Lindsey & Bob!");
         unlockedSkins['lindsey'] = true;
+        unlockedSkins['bob'] = true;
         localStorage.setItem('unlockedSkins', JSON.stringify(unlockedSkins));
         injectLindseyAvatar();
     } else if (pwd !== null) {
@@ -322,6 +378,8 @@ function startGame() {
     
     shopThresholds = [25, 55, 90]; 
 
+    difficultyMult = parseFloat(document.getElementById('difficultySelect').value);
+
     let initialWeapons = {};
     WEAPONS.forEach(w => initialWeapons[w.id] = 0);
     initialWeapons['gun'] = 1; // Every avatar starts with a basic pistol to defend themselves
@@ -332,7 +390,7 @@ function startGame() {
         y: canvas.height / 2,
         radius: 20,
         speed: 300,
-        hp: 10,
+        hp: Math.floor(10 / difficultyMult),
         money: 0,
         kills: 0,
         weapons: JSON.parse(JSON.stringify(initialWeapons)),
@@ -519,6 +577,26 @@ function gameLoop(currentTime) {
     const dt = (currentTime - lastTime) / 1000; 
     lastTime = currentTime;
 
+    // Biome Transition Fade State
+    if (transitionPhase === 1) {
+        transitionAlpha += dt;
+        if (transitionAlpha >= 1) {
+            transitionAlpha = 1;
+            transitionPhase = 2;
+            currentBiomeIndex = targetBiomeIndex;
+            generateObstacles(BIOMES[currentBiomeIndex]);
+        }
+        draw();
+        requestAnimationFrame(gameLoop);
+        return; // Don't process game logic while fading to black
+    } else if (transitionPhase === 2) {
+        transitionAlpha -= dt;
+        if (transitionAlpha <= 0) {
+            transitionAlpha = 0;
+            transitionPhase = 0;
+        }
+    }
+
     update(dt);
     draw();
 
@@ -564,7 +642,37 @@ function update(dt) {
         player.x = Math.max(player.radius, Math.min(canvas.width - player.radius, player.x));
         player.y = Math.max(player.radius, Math.min(canvas.height - player.radius, player.y));
 
-        obstacles.forEach(obs => resolveCollision(player, obs));
+        obstacles.forEach(obs => {
+            resolveCollision(player, obs);
+            
+            // Hazards
+            const dist = Math.hypot(player.x - obs.x, player.y - obs.y);
+            if (dist < player.radius + obs.radius + 5 && player.invincibility <= 0) {
+                if (obs.icon === '🌵' || obs.icon === '🧊') {
+                    player.hp -= 2;
+                    player.invincibility = 1.0;
+                    if (player.hp <= 0) { endGame(); return; }
+                    updateHUD();
+                }
+            }
+            
+            // Volcano Eruptions
+            if (obs.icon === '🌋') {
+                if (!obs.timer) obs.timer = 0;
+                obs.timer += dt * timeScale;
+                if (obs.timer > 3.0) {
+                    obs.timer = 0;
+                    for(let i=0; i<3; i++) {
+                        projectiles.push({
+                            type: 'hazard', wType: 'explosion', 
+                            x: obs.x, y: obs.y - obs.radius, 
+                            vx: (Math.random()-0.5)*300, vy: -100 - Math.random()*200,
+                            radius: 12, color: 'orange', life: 2.0, maxLife: 2.0, pierce: true, damage: 3
+                        });
+                    }
+                }
+            }
+        });
 
         // Reduce item spawn rate to make survival harder
         if (distanceMoved > 800) { 
@@ -580,7 +688,7 @@ function update(dt) {
 
     // Slower base spawn rate for an easier start, but scales MUCH harder
     const baseSpawnRate = 0.005 * timeScale; 
-    const scaledSpawnRate = baseSpawnRate * (1 + (level * 0.8) + (weaponPower * 0.15));
+    const scaledSpawnRate = baseSpawnRate * (1 + (level * 0.8) + (weaponPower * 0.15)) * difficultyMult;
     
     if (Math.random() < scaledSpawnRate) {
         spawnEnemy(level, weaponPower);
@@ -670,10 +778,22 @@ function update(dt) {
                     }
                 }
                 // spawn explosion visual
+                playSound('rocket');
                 projectiles.push({ type: 'explosion', wType: 'explosion', x: p.x, y: p.y, vx:0, vy:0, radius: p.radius * 5, life: 0.5, maxLife: 0.5, damage: 0 });
             }
             projectiles.splice(i, 1);
             continue;
+        }
+
+        if (p.type === 'hazard') {
+            const pDist = Math.hypot(p.x - player.x, p.y - player.y);
+            if (pDist < p.radius + player.radius && player.invincibility <= 0) {
+                player.hp -= p.damage;
+                player.invincibility = 1.0;
+                updateHUD();
+                if (player.hp <= 0) { endGame(); return; }
+            }
+            continue; // Hazards don't hurt enemies
         }
 
         if (p.type === 'explosion') continue; // Explosions don't do collision damage over time, just visuals
@@ -779,6 +899,7 @@ function update(dt) {
         // Laser
         lvl = player.weapons.laser;
         if (lvl > 0 && survivalTime - (player.lastShot.laser || 0) > 1.5 / lvl) {
+            playSound('laser');
             nearest.hp -= 5 + lvl;
             if (nearest.hp <= 0) killEnemy(enemies.indexOf(nearest));
             projectiles.push({ type: 'laser', wType: 'laser', x: nearest.x, y: nearest.y, vx:0, vy:0, radius: 2, color: 'cyan', life: 0.2, damage: 0 });
@@ -847,6 +968,7 @@ function update(dt) {
 }
 
 function fireProjectile(x, y, angle, speed, radius, color, life, pierce, damage = 1, wType = 'normal') {
+    playSound(wType);
     projectiles.push({
         type: 'normal', wType, x, y,
         vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
@@ -883,8 +1005,8 @@ function killEnemy(index) {
         const newLevel = Math.floor(player.kills / 60) + 1;
         if (newLevel > player.currentLevel) {
             player.currentLevel = newLevel;
-            currentBiomeIndex = (newLevel - 1) % BIOMES.length;
-            generateObstacles(BIOMES[currentBiomeIndex]);
+            targetBiomeIndex = (newLevel - 1) % BIOMES.length;
+            transitionPhase = 1;
         }
         
         updateHUD();
@@ -901,8 +1023,8 @@ function spawnEnemy(level, weaponPower) {
         y = Math.random() < 0.5 ? -30 : canvas.height + 30;
     }
 
-    let hp = 1 + Math.floor(level * 0.5); // Base health scales up now
-    let speed = (130 + Math.random() * 50) * (1 + (level * 0.15) + (weaponPower * 0.03));
+    let hp = (1 + Math.floor(level * 0.5)) * difficultyMult; // Base health scales up now
+    let speed = (130 + Math.random() * 50) * (1 + (level * 0.15) + (weaponPower * 0.03)) * Math.sqrt(difficultyMult);
     let radius = 18;
     let icon = '🕵️';
     let type = 'normal';
@@ -1147,6 +1269,12 @@ function draw() {
             ctx.fillText(avatarChoiceIcon, player.x, player.y);
         }
         ctx.shadowBlur = 0;
+    }
+
+    // Fade Overlay
+    if (transitionPhase > 0) {
+        ctx.fillStyle = `rgba(0, 0, 0, ${transitionAlpha})`;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
 }
 
