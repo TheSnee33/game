@@ -74,9 +74,9 @@ function playSound(type) {
     const now = audioCtx.currentTime;
 
     if (type === 'gun' || type === 'sniper' || type === 'shotgun') {
-        osc.type = 'square';
-        osc.frequency.setValueAtTime(150, now);
-        osc.frequency.exponentialRampToValueAtTime(0.01, now + 0.1);
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(100, now);
+        osc.frequency.exponentialRampToValueAtTime(10, now + 0.1);
         gainNode.gain.setValueAtTime(0.05, now);
         gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
         osc.start(now); osc.stop(now + 0.1);
@@ -88,10 +88,11 @@ function playSound(type) {
         gainNode.gain.linearRampToValueAtTime(0.01, now + 0.2);
         osc.start(now); osc.stop(now + 0.2);
     } else if (type === 'laser') {
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(800, now);
-        gainNode.gain.setValueAtTime(0.02, now);
-        gainNode.gain.linearRampToValueAtTime(0.01, now + 0.1);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(400, now);
+        osc.frequency.exponentialRampToValueAtTime(200, now + 0.1);
+        gainNode.gain.setValueAtTime(0.03, now);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
         osc.start(now); osc.stop(now + 0.1);
     } else if (type === 'rocket') {
         osc.type = 'square';
@@ -100,6 +101,22 @@ function playSound(type) {
         gainNode.gain.setValueAtTime(0.1, now);
         gainNode.gain.linearRampToValueAtTime(0.01, now + 0.3);
         osc.start(now); osc.stop(now + 0.3);
+    } else if (type === 'volcano') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(100, now);
+        osc.frequency.exponentialRampToValueAtTime(10, now + 0.5);
+        gainNode.gain.setValueAtTime(0.3, now);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+        osc.start(now); osc.stop(now + 0.5);
+    } else if (type === 'ghost') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(600, now);
+        osc.frequency.linearRampToValueAtTime(800, now + 0.2);
+        osc.frequency.linearRampToValueAtTime(500, now + 0.5);
+        gainNode.gain.setValueAtTime(0, now);
+        gainNode.gain.linearRampToValueAtTime(0.1, now + 0.2);
+        gainNode.gain.linearRampToValueAtTime(0, now + 0.5);
+        osc.start(now); osc.stop(now + 0.5);
     }
 }
 
@@ -351,7 +368,8 @@ function generateObstacles(biome) {
             obstacles.push({
                 x: ox, y: oy,
                 radius: 25 + Math.random() * 15,
-                icon: biome.icons[Math.floor(Math.random() * biome.icons.length)]
+                icon: biome.icons[Math.floor(Math.random() * biome.icons.length)],
+                timer: Math.random() * 3.0 // Used for random volcano offsets
             });
         }
     }
@@ -384,13 +402,16 @@ function startGame() {
     WEAPONS.forEach(w => initialWeapons[w.id] = 0);
     initialWeapons['gun'] = 1; // Every avatar starts with a basic pistol to defend themselves
     
+    const baseHp = Math.floor(10 / difficultyMult);
+
     // Completely isolated fresh player state to prevent any 'spreading' of skills from death
     player = {
         x: canvas.width / 2,
         y: canvas.height / 2,
         radius: 20,
         speed: 300,
-        hp: Math.floor(10 / difficultyMult),
+        hp: baseHp,
+        maxHp: baseHp,
         money: 0,
         kills: 0,
         weapons: JSON.parse(JSON.stringify(initialWeapons)),
@@ -557,7 +578,8 @@ function updateHUD() {
     moneyDisplay.innerText = player.money;
     
     healthText.innerText = player.hp + " HP";
-    const hpPercent = Math.min(100, (player.hp / 10) * 100);
+    player.maxHp = Math.max(player.maxHp, player.hp); // Track highest HP for correct scaling
+    const hpPercent = Math.min(100, (player.hp / player.maxHp) * 100);
     healthBarFill.style.width = hpPercent + "%";
 
     let activeWeapons = [];
@@ -624,7 +646,22 @@ function update(dt) {
         player.regenTimer += dt * timeScale;
         if (player.regenTimer >= player.regen) {
             player.hp += 1;
+            player.maxHp = Math.max(player.maxHp, player.hp);
             player.regenTimer = 0;
+            updateHUD();
+        }
+    }
+
+    // Bob rapid leveling
+    if (avatarChoice === 'bob' && isPlaying) {
+        if (!player.bobTimer) player.bobTimer = 0;
+        player.bobTimer += dt * timeScale;
+        if (player.bobTimer >= 1.0) {
+            player.bobTimer = 0;
+            player.avatarLevel++;
+            const ab = AVATAR_ABILITIES['bob'];
+            if (ab && ab.onLevelUp) ab.onLevelUp(player);
+            player.maxHp = Math.max(player.maxHp, player.hp);
             updateHUD();
         }
     }
@@ -653,15 +690,25 @@ function update(dt) {
                     player.invincibility = 1.0;
                     if (player.hp <= 0) { endGame(); return; }
                     updateHUD();
+                } else if (obs.icon === '🔮') {
+                    playSound('ghost');
+                    projectiles.push({
+                        type: 'hazard', wType: 'ghost',
+                        x: obs.x, y: obs.y - obs.radius,
+                        vx: (Math.random()-0.5)*200, vy: (Math.random()-0.5)*200,
+                        radius: 15, color: 'rgba(255,255,255,0.8)', life: 3.0, maxLife: 3.0, pierce: true, damage: 1
+                    });
+                    player.invincibility = 0.5;
                 }
             }
             
             // Volcano Eruptions
             if (obs.icon === '🌋') {
-                if (!obs.timer) obs.timer = 0;
+                if (!obs.timer) obs.timer = Math.random() * 3.0;
                 obs.timer += dt * timeScale;
                 if (obs.timer > 3.0) {
                     obs.timer = 0;
+                    playSound('volcano');
                     for(let i=0; i<3; i++) {
                         projectiles.push({
                             type: 'hazard', wType: 'explosion', 
@@ -1208,6 +1255,13 @@ function draw() {
             ctx.arc(0, 0, p.radius, 0, Math.PI * 2);
             ctx.fillStyle = `rgba(255, 255, 0, ${p.life * 2})`;
             ctx.fill();
+        } else if (p.wType === 'ghost') {
+            ctx.font = `${p.radius * 2}px Arial`;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.globalAlpha = p.life / p.maxLife; // fade out
+            ctx.fillText('👻', 0, 0);
+            ctx.globalAlpha = 1.0;
         } else {
             // Standard generic bullet (Gun, Shotgun, Sniper)
             ctx.rotate(Math.atan2(p.vy, p.vx));
@@ -1270,6 +1324,14 @@ function draw() {
         }
         ctx.shadowBlur = 0;
     }
+
+    // Player HP Bar (above head)
+    const pMaxHp = Math.max(1, player.maxHp || 1);
+    const pHpPercent = Math.max(0, Math.min(1, player.hp / pMaxHp));
+    ctx.fillStyle = 'red';
+    ctx.fillRect(player.x - 20, player.y - player.radius - 12, 40, 5);
+    ctx.fillStyle = 'lime';
+    ctx.fillRect(player.x - 20, player.y - player.radius - 12, 40 * pHpPercent, 5);
 
     // Fade Overlay
     if (transitionPhase > 0) {

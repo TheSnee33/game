@@ -32,6 +32,18 @@
         <div id="mainMenu" class="overlay">
             <h1>CHRONO SPIES</h1>
             <p>Select your avatar to start: (Use Arrow Keys + Enter)</p>
+            
+            <div style="margin-bottom: 15px; text-align: center;">
+                <label style="color: #ff5555; font-weight: bold; font-family: 'Press Start 2P', cursive; font-size: 10px;">DIFFICULTY:</label>
+                <select id="difficultySelect" style="background: #222; color: #fff; border: 2px solid #555; padding: 5px; font-family: 'Outfit', sans-serif; border-radius: 4px; margin-left: 10px;">
+                    <option value="0.5">Novice</option>
+                    <option value="0.8">Easy</option>
+                    <option value="1.0" selected>Medium</option>
+                    <option value="1.5">Hard</option>
+                    <option value="2.5">Unhinged</option>
+                </select>
+            </div>
+
             <div class="avatar-selection" id="avatarSelection">
                 <!-- Standard Avatars -->
                 <button class="avatar-btn" data-unlocked="true" data-type="emoji" data-id="alien">👽</button>
@@ -51,16 +63,6 @@
                 Use Arrow Keys or WASD to move.<br>
                 Find items to unlock weapons.<br>
                 Survive the escalating spy threat!
-            </div>
-            <div style="margin-top: 15px; text-align: center;">
-                <label style="color: #ff5555; font-weight: bold; font-family: 'Press Start 2P', cursive; font-size: 10px;">DIFFICULTY:</label>
-                <select id="difficultySelect" style="background: #222; color: #fff; border: 2px solid #555; padding: 5px; font-family: 'Outfit', sans-serif; border-radius: 4px; margin-left: 10px;">
-                    <option value="0.5">Novice</option>
-                    <option value="0.8">Easy</option>
-                    <option value="1.0" selected>Medium</option>
-                    <option value="1.5">Hard</option>
-                    <option value="2.5">Unhinged</option>
-                </select>
             </div>
             <div id="secretDevBtn" style="position:absolute; bottom:20px; left:20px; width:60px; height:60px; background-color: #222; border: 2px solid #555; cursor:pointer; display:flex; justify-content:center; align-items:center; font-family: 'Press Start 2P', cursive; font-size:10px; color:#555; border-radius: 5px;">DEV</div>
         </div>
