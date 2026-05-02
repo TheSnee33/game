@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chrono Spies</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Outfit:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="gameCanvas"></canvas>
+        
+        <!-- UI Overlay -->
+        <div id="hud" class="hidden">
+            <div id="scoreDisplay">Time Survived: <span id="timeSurvived">0</span>s</div>
+            <div id="itemDisplay">Current Item: <span id="currentItem">None</span></div>
+        </div>
+
+        <!-- Main Menu -->
+        <div id="mainMenu" class="overlay">
+            <h1>CHRONO SPIES</h1>
+            <p>Time moves slowly when you stand still...</p>
+            <p>Select your avatar to start:</p>
+            <div class="avatar-selection">
+                <button class="avatar-btn" data-avatar="1">
+                    <div class="avatar-icon avatar-1">👽</div>
+                    Alien
+                </button>
+                <button class="avatar-btn" data-avatar="2">
+                    <div class="avatar-icon avatar-2">🤖</div>
+                    Robot
+                </button>
+            </div>
+            <div class="controls-info">
+                Use Arrow Keys or WASD to move.<br>
+                Move to find items (Clock, Gun, Staff).<br>
+                Avoid the Spies!
+            </div>
+        </div>
+
+        <!-- Game Over -->
+        <div id="gameOver" class="overlay hidden">
+            <h1>GAME OVER</h1>
+            <p>You were caught by a spy!</p>
+            <p>Time Survived: <span id="finalTime">0</span>s</p>
+            <button id="restartBtn">Play Again</button>
+        </div>
+    </div>
+    
+    <script src="game.js"></script>
+</body>
+</html>
