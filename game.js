@@ -16,6 +16,7 @@ const healthText = document.getElementById('healthText');
 const shopMoneyEl = document.getElementById('shopMoney');
 const resumeBtn = document.getElementById('resumeBtn');
 const avatarSelectionContainer = document.getElementById('avatarSelection');
+const secretDevBtn = document.getElementById('secretDevBtn');
 
 // Shop Tabs
 const tabWeapons = document.getElementById('tabWeapons');
@@ -60,16 +61,16 @@ resizeCanvas();
 
 // --- Data ---
 const WEAPONS = [
-    { id: 'gun', name: 'Gun', icon: '🔫', baseCost: 25 },
-    { id: 'staff', name: 'Staff', icon: '🪄', baseCost: 25 },
-    { id: 'shotgun', name: 'Shotgun', icon: '💥', baseCost: 25 },
-    { id: 'sniper', name: 'Sniper', icon: '🔭', baseCost: 25 },
-    { id: 'boomerang', name: 'Boomerang', icon: '🪃', baseCost: 25 },
-    { id: 'laser', name: 'Laser', icon: '⚡', baseCost: 25 },
-    { id: 'rocket', name: 'Rocket', icon: '🚀', baseCost: 25 },
-    { id: 'poison', name: 'Poison', icon: '🧪', baseCost: 25 },
-    { id: 'orbs', name: 'Orbs', icon: '🔮', baseCost: 25 },
-    { id: 'lightning', name: 'Lightning', icon: '🌩️', baseCost: 25 }
+    { id: 'gun', name: 'Gun', icon: '🔫', baseCost: 50 },
+    { id: 'staff', name: 'Staff', icon: '🪄', baseCost: 50 },
+    { id: 'shotgun', name: 'Shotgun', icon: '💥', baseCost: 50 },
+    { id: 'sniper', name: 'Sniper', icon: '🔭', baseCost: 50 },
+    { id: 'boomerang', name: 'Boomerang', icon: '🪃', baseCost: 50 },
+    { id: 'laser', name: 'Laser', icon: '⚡', baseCost: 50 },
+    { id: 'rocket', name: 'Rocket', icon: '🚀', baseCost: 50 },
+    { id: 'poison', name: 'Poison', icon: '🧪', baseCost: 50 },
+    { id: 'orbs', name: 'Orbs', icon: '🔮', baseCost: 50 },
+    { id: 'lightning', name: 'Lightning', icon: '🌩️', baseCost: 50 }
 ];
 
 const PREMIUM_SKINS = [
@@ -81,14 +82,14 @@ const PREMIUM_SKINS = [
     { id: 'rex', icon: '🦖', price: 4000 },
     { id: 'fairy', icon: '🧚', price: 5000 },
     { id: 'genie', icon: '🧞‍♂️', price: 6000 },
-    { id: 'villain', icon: '🦹‍♀️', price: 7500 },
-    { id: 'lindsey', icon: '<img src="lindsey.png">', isImage: true, price: 10000 }
+    { id: 'villain', icon: '🦹‍♀️', price: 7500 }
 ];
 
+// Items no longer include weapons. Only utility drops.
 const ITEM_TYPES = [
     { name: 'Armor', icon: '🛡️', color: '#00ff00', type: 'health' },
     { name: 'Clock', icon: '⏱️', color: '#00ffff', type: 'time' },
-    ...WEAPONS.map(w => ({ name: w.name, icon: w.icon, color: '#ffff00', type: 'weapon', id: w.id }))
+    { name: 'Money', icon: '💰', color: '#ffff00', type: 'money' }
 ];
 
 const AVATAR_ABILITIES = {
@@ -125,7 +126,7 @@ let unlockedSkins = JSON.parse(localStorage.getItem('unlockedSkins') || '{}');
 
 // Build UI
 function initMenu() {
-    // Inject Premium Skins
+    // Inject Premium Skins (Lindsey is excluded and handled secretly)
     PREMIUM_SKINS.forEach(skin => {
         const btn = document.createElement('button');
         btn.className = 'avatar-btn';
@@ -141,7 +142,28 @@ function initMenu() {
         avatarSelectionContainer.appendChild(btn);
     });
 
-    // Add tooltips to all avatars
+    if (unlockedSkins['lindsey']) {
+        injectLindseyAvatar();
+    }
+
+    updateTooltips();
+    setupAvatarSelection();
+}
+
+function injectLindseyAvatar() {
+    if (document.querySelector('.avatar-btn[data-id="lindsey"]')) return;
+    const btn = document.createElement('button');
+    btn.className = 'avatar-btn';
+    btn.innerHTML = '<img src="lindsey.png" style="width:100%;height:100%;border-radius:5px;object-fit:cover;">';
+    btn.dataset.id = 'lindsey';
+    btn.dataset.unlocked = "true";
+    btn.dataset.type = 'image';
+    avatarSelectionContainer.appendChild(btn);
+    updateTooltips();
+    setupAvatarSelection();
+}
+
+function updateTooltips() {
     document.querySelectorAll('.avatar-btn').forEach(btn => {
         const id = btn.dataset.id;
         const ab = AVATAR_ABILITIES[id];
@@ -149,9 +171,23 @@ function initMenu() {
             btn.title = `Ability: ${ab.name} - ${ab.desc} (Levels up every 75 kills)`;
         }
     });
-
-    setupAvatarSelection();
 }
+
+secretDevBtn.addEventListener('click', () => {
+    if (unlockedSkins['lindsey']) {
+        alert("Dev testing avatar already unlocked.");
+        return;
+    }
+    const pwd = prompt("Enter Dev Password:");
+    if (pwd === "admin") {
+        alert("Dev Testing Avatar Unlocked!");
+        unlockedSkins['lindsey'] = true;
+        localStorage.setItem('unlockedSkins', JSON.stringify(unlockedSkins));
+        injectLindseyAvatar();
+    } else if (pwd !== null) {
+        alert("Incorrect password.");
+    }
+});
 
 let avatarIndex = 0;
 let avatarBtns = [];
@@ -227,11 +263,12 @@ function startGame() {
     distanceMoved = 0;
     clockTimer = 0;
     
-    shopThresholds = [25, 55, 90]; // First three automatic shop triggers
+    shopThresholds = [25, 55, 90]; 
 
     let initialWeapons = {};
     WEAPONS.forEach(w => initialWeapons[w.id] = 0);
     
+    // Completely isolated fresh player state to prevent any 'spreading' of skills from death
     player = {
         x: canvas.width / 2,
         y: canvas.height / 2,
@@ -240,10 +277,9 @@ function startGame() {
         hp: 1,
         money: 0,
         kills: 0,
-        weapons: initialWeapons,
+        weapons: JSON.parse(JSON.stringify(initialWeapons)),
         lastShot: {},
         invincibility: 0,
-        // Modifiers for abilities
         iFrameMult: 1.0,
         sneaky: 1.0,
         regen: 0,
@@ -251,14 +287,14 @@ function startGame() {
         lifesteal: 0,
         moneyMult: 1,
         enemyHpMult: 1.0,
-        // Leveling
         avatarLevel: 1
     };
 
-    // Apply Avatar Abilities
+    // Apply Avatar Abilities to the fresh player object
     const ab = AVATAR_ABILITIES[avatarChoice];
-    if (ab) ab.effect(player);
+    if (ab && ab.effect) ab.effect(player);
     
+    // Clear all persistent entities
     enemies = [];
     items = [];
     projectiles = [];
@@ -311,17 +347,18 @@ function buildShopUI() {
     // Armor
     const armorDiv = document.createElement('div');
     armorDiv.className = 'shop-item';
+    const armorCost = 50 + (player.hp * 5); // Armor cost scales up as you get more
     armorDiv.innerHTML = `
         <div class="shop-icon">🛡️</div>
         <h3>Armor</h3>
-        <div class="price">$25</div>
+        <div class="price">$${armorCost}</div>
         <button class="buy-btn">Buy</button>
     `;
     const armorBtn = armorDiv.querySelector('.buy-btn');
-    armorBtn.disabled = player.money < 25;
+    armorBtn.disabled = player.money < armorCost;
     armorBtn.addEventListener('click', () => {
-        if (player.money >= 25) {
-            player.money -= 25;
+        if (player.money >= armorCost) {
+            player.money -= armorCost;
             player.hp += 3;
             buildShopUI();
             updateHUD();
@@ -332,7 +369,7 @@ function buildShopUI() {
     // Weapons
     WEAPONS.forEach(w => {
         const lvl = player.weapons[w.id];
-        const cost = 25 + (lvl * 25);
+        const cost = w.baseCost + (lvl * 75); // Steep scaling to prevent quick dominating
         const div = document.createElement('div');
         div.className = 'shop-item';
         div.innerHTML = `
@@ -340,7 +377,7 @@ function buildShopUI() {
             <h3>${w.name}</h3>
             <div class="level">Lv.${lvl} -> Lv.${lvl+1}</div>
             <div class="price">$${cost}</div>
-            <button class="buy-btn">Upgrade</button>
+            <button class="buy-btn">${lvl === 0 ? 'Unlock' : 'Upgrade'}</button>
         `;
         const btn = div.querySelector('.buy-btn');
         btn.disabled = player.money < cost;
@@ -463,9 +500,10 @@ function update(dt) {
         player.x = Math.max(player.radius, Math.min(canvas.width - player.radius, player.x));
         player.y = Math.max(player.radius, Math.min(canvas.height - player.radius, player.y));
 
-        if (distanceMoved > 250) { 
+        // Massively reduce item spawn rate (was 250, now 800) and only utility items
+        if (distanceMoved > 800) { 
             distanceMoved = 0;
-            if (Math.random() > 0.5) spawnItem();
+            if (Math.random() > 0.6) spawnItem();
         }
     }
 
@@ -475,7 +513,7 @@ function update(dt) {
     for (let w in player.weapons) weaponPower += player.weapons[w];
 
     const baseSpawnRate = 0.015 * timeScale; 
-    const scaledSpawnRate = baseSpawnRate * (1 + (level * 0.2) + (weaponPower * 0.05));
+    const scaledSpawnRate = baseSpawnRate * (1 + (level * 0.3) + (weaponPower * 0.08));
     
     if (Math.random() < scaledSpawnRate) {
         spawnEnemy(level, weaponPower);
@@ -498,7 +536,7 @@ function update(dt) {
         poisons.forEach(puddle => {
             const pDist = Math.hypot(puddle.x - enemy.x, puddle.y - enemy.y);
             if (pDist < puddle.radius + enemy.radius) {
-                enemy.hp -= 2 * dt * timeScale; 
+                enemy.hp -= 3 * dt * timeScale; 
             }
         });
 
@@ -580,21 +618,19 @@ function update(dt) {
         }
     }
 
-    // Items
+    // Items Logic
     for (let i = items.length - 1; i >= 0; i--) {
         const item = items[i];
         item.life -= dt * timeScale;
         if (item.life <= 0) { items.splice(i, 1); continue; }
 
         if (Math.hypot(player.x - item.x, player.y - item.y) < player.radius + item.radius) {
-            if (item.type.type === 'weapon') {
-                if (player.weapons[item.type.id] === 0) {
-                    player.weapons[item.type.id] = 1; 
-                }
-            } else if (item.type.name === 'Armor') {
+            if (item.type.name === 'Armor') {
                 player.hp += 3;
             } else if (item.type.name === 'Clock') {
                 clockTimer = 5.0; 
+            } else if (item.type.type === 'money') {
+                player.money += 10 * player.moneyMult;
             }
             items.splice(i, 1);
             updateHUD();
