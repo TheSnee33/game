@@ -565,21 +565,21 @@ function update(dt) {
 
         obstacles.forEach(obs => resolveCollision(player, obs));
 
-        // Massively reduce item spawn rate (was 250, now 500) and drop utility+weapons
-        if (distanceMoved > 500) { 
+        // Reduce item spawn rate to make survival harder
+        if (distanceMoved > 800) { 
             distanceMoved = 0;
-            if (Math.random() > 0.4) spawnItem();
+            if (Math.random() > 0.7) spawnItem();
         }
     }
 
     // Difficulty Scaling Variables
-    const level = Math.floor(player.kills / 100) + 1;
+    const level = Math.floor(player.kills / 60) + 1; // Level up faster to increase difficulty quicker
     let weaponPower = 0;
     for (let w in player.weapons) weaponPower += player.weapons[w];
 
-    // Slower base spawn rate for an easier start
+    // Slower base spawn rate for an easier start, but scales MUCH harder
     const baseSpawnRate = 0.005 * timeScale; 
-    const scaledSpawnRate = baseSpawnRate * (1 + (level * 0.5) + (weaponPower * 0.1));
+    const scaledSpawnRate = baseSpawnRate * (1 + (level * 0.8) + (weaponPower * 0.15));
     
     if (Math.random() < scaledSpawnRate) {
         spawnEnemy(level, weaponPower);
@@ -869,8 +869,8 @@ function killEnemy(index) {
             player.hp += 1;
         }
 
-        // Avatar Level Up (Every 75 Kills)
-        if (player.kills % 75 === 0) {
+        // Avatar Level Up (Harder)
+        if (player.kills % 150 === 0) {
             player.avatarLevel++;
             const ab = AVATAR_ABILITIES[avatarChoice];
             if (ab && ab.onLevelUp) {
@@ -878,8 +878,8 @@ function killEnemy(index) {
             }
         }
 
-        // Level Up Trigger for Biomes (Every 100 kills)
-        const newLevel = Math.floor(player.kills / 100) + 1;
+        // Level Up Trigger for Biomes (Every 60 kills to match new difficulty ramp)
+        const newLevel = Math.floor(player.kills / 60) + 1;
         if (newLevel > player.currentLevel) {
             player.currentLevel = newLevel;
             currentBiomeIndex = (newLevel - 1) % BIOMES.length;
@@ -900,39 +900,39 @@ function spawnEnemy(level, weaponPower) {
         y = Math.random() < 0.5 ? -30 : canvas.height + 30;
     }
 
-    let hp = 1;
-    let speed = (100 + Math.random() * 50) * (1 + (level * 0.1) + (weaponPower * 0.02));
+    let hp = 1 + Math.floor(level * 0.5); // Base health scales up now
+    let speed = (130 + Math.random() * 50) * (1 + (level * 0.15) + (weaponPower * 0.03));
     let radius = 18;
     let icon = '🕵️';
     let type = 'normal';
 
-    // Scaling Enemy Types
-    if (level > 4 && Math.random() < 0.1) {
+    // Scaling Enemy Types (Appear much more frequently and hit harder)
+    if (level > 4 && Math.random() < 0.15) {
         icon = '🤖'; // Terminator
-        hp = 10 * (1 + level * 0.8);
-        speed *= 0.5;
+        hp = 15 * (1 + level * 0.8);
+        speed *= 0.6;
         radius = 30;
         type = 'terminator';
-    } else if (level > 3 && Math.random() < 0.15) {
+    } else if (level > 3 && Math.random() < 0.2) {
         icon = '👽'; // Invader (Immune to Poison)
-        hp = 6 * (1 + level * 0.5);
-        speed *= 0.8;
+        hp = 8 * (1 + level * 0.5);
+        speed *= 0.9;
         radius = 22;
         type = 'invader';
-    } else if (level > 2 && Math.random() < 0.15) {
+    } else if (level > 2 && Math.random() < 0.25) {
         icon = '🧛'; // Vampire (Heals on hit)
-        hp = 4 * (1 + level * 0.3);
-        speed *= 1.2;
+        hp = 5 * (1 + level * 0.4);
+        speed *= 1.3;
         type = 'vampire';
-    } else if (level > 1 && Math.random() < 0.2) {
+    } else if (level > 1 && Math.random() < 0.3) {
         icon = '👹'; // Brute
-        hp = 5 * (1 + level * 0.5);
-        speed *= 0.6;
+        hp = 8 * (1 + level * 0.5);
+        speed *= 0.7;
         radius = 25;
         type = 'brute';
-    } else if (level > 1 && Math.random() < 0.2) {
+    } else if (level > 1 && Math.random() < 0.3) {
         icon = '🥷'; // Assassin
-        hp = 2 * (1 + level * 0.2);
+        hp = 3 * (1 + level * 0.3);
         speed *= 1.8;
         type = 'assassin';
     } else if (Math.random() < 0.05) {
