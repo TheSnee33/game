@@ -85,11 +85,12 @@ const PREMIUM_SKINS = [
     { id: 'villain', icon: '🦹‍♀️', price: 7500 }
 ];
 
-// Items no longer include weapons. Only utility drops.
+// Items include basic weapons for early survival.
 const ITEM_TYPES = [
     { name: 'Armor', icon: '🛡️', color: '#00ff00', type: 'health' },
     { name: 'Clock', icon: '⏱️', color: '#00ffff', type: 'time' },
-    { name: 'Money', icon: '💰', color: '#ffff00', type: 'money' }
+    { name: 'Money', icon: '💰', color: '#ffff00', type: 'money' },
+    ...WEAPONS.map(w => ({ name: w.name, icon: w.icon, color: '#ffff00', type: 'weapon', id: w.id }))
 ];
 
 const AVATAR_ABILITIES = {
@@ -500,10 +501,10 @@ function update(dt) {
         player.x = Math.max(player.radius, Math.min(canvas.width - player.radius, player.x));
         player.y = Math.max(player.radius, Math.min(canvas.height - player.radius, player.y));
 
-        // Massively reduce item spawn rate (was 250, now 800) and only utility items
-        if (distanceMoved > 800) { 
+        // Massively reduce item spawn rate (was 250, now 500) and drop utility+weapons
+        if (distanceMoved > 500) { 
             distanceMoved = 0;
-            if (Math.random() > 0.6) spawnItem();
+            if (Math.random() > 0.4) spawnItem();
         }
     }
 
@@ -534,6 +535,7 @@ function update(dt) {
 
         // Poison Damage
         poisons.forEach(puddle => {
+            if (enemy.type === 'invader') return; // Immune to poison
             const pDist = Math.hypot(puddle.x - enemy.x, puddle.y - enemy.y);
             if (pDist < puddle.radius + enemy.radius) {
                 enemy.hp -= 3 * dt * timeScale; 
@@ -548,6 +550,9 @@ function update(dt) {
         // Collision with player
         if (dist < player.radius + enemy.radius && player.invincibility <= 0) {
             player.hp -= 1;
+            if (enemy.type === 'vampire') {
+                enemy.hp = Math.min(enemy.maxHp, enemy.hp + 2); // Vampire heals on hit
+            }
             player.invincibility = 1.0 * player.iFrameMult; 
             updateHUD();
             if (player.hp <= 0) { endGame(); return; }
@@ -625,7 +630,11 @@ function update(dt) {
         if (item.life <= 0) { items.splice(i, 1); continue; }
 
         if (Math.hypot(player.x - item.x, player.y - item.y) < player.radius + item.radius) {
-            if (item.type.name === 'Armor') {
+            if (item.type.type === 'weapon') {
+                if (player.weapons[item.type.id] === 0) {
+                    player.weapons[item.type.id] = 1; 
+                }
+            } else if (item.type.name === 'Armor') {
                 player.hp += 3;
             } else if (item.type.name === 'Clock') {
                 clockTimer = 5.0; 
@@ -764,9 +773,14 @@ function fireProjectile(x, y, angle, speed, radius, color, life, pierce, damage 
 
 function killEnemy(index) {
     if (index > -1 && index < enemies.length) {
+        const enemy = enemies[index];
         enemies.splice(index, 1);
         player.kills++;
         player.money += 1 * player.moneyMult;
+        
+        if (enemy.type === 'loot') {
+            player.money += 20 * player.moneyMult; // Bonus money for Unicorn Goblin
+        }
         
         // Lifesteal ability
         if (player.lifesteal > 0 && Math.random() < player.lifesteal) {
@@ -800,23 +814,48 @@ function spawnEnemy(level, weaponPower) {
     let speed = (100 + Math.random() * 50) * (1 + (level * 0.1) + (weaponPower * 0.02));
     let radius = 18;
     let icon = '🕵️';
+    let type = 'normal';
 
     // Scaling Enemy Types
-    if (level > 1 && Math.random() < 0.2) {
+    if (level > 4 && Math.random() < 0.1) {
+        icon = '🤖'; // Terminator
+        hp = 10 * (1 + level * 0.8);
+        speed *= 0.5;
+        radius = 30;
+        type = 'terminator';
+    } else if (level > 3 && Math.random() < 0.15) {
+        icon = '👽'; // Invader (Immune to Poison)
+        hp = 6 * (1 + level * 0.5);
+        speed *= 0.8;
+        radius = 22;
+        type = 'invader';
+    } else if (level > 2 && Math.random() < 0.15) {
+        icon = '🧛'; // Vampire (Heals on hit)
+        hp = 4 * (1 + level * 0.3);
+        speed *= 1.2;
+        type = 'vampire';
+    } else if (level > 1 && Math.random() < 0.2) {
         icon = '👹'; // Brute
         hp = 5 * (1 + level * 0.5);
         speed *= 0.6;
         radius = 25;
-    } else if (level > 2 && Math.random() < 0.2) {
+        type = 'brute';
+    } else if (level > 1 && Math.random() < 0.2) {
         icon = '🥷'; // Assassin
         hp = 2 * (1 + level * 0.2);
+        speed *= 1.8;
+        type = 'assassin';
+    } else if (Math.random() < 0.05) {
+        icon = '🦄'; // Loot Goblin
+        hp = 1;
         speed *= 2.0;
+        type = 'loot';
     }
 
     // Apply Avatar Global Enemy Modifiers
     hp *= player.enemyHpMult;
 
-    enemies.push({ x, y, radius, speed, hp, maxHp: hp, icon });
+    enemies.push({ x, y, radius, speed, hp, maxHp: hp, icon, type });
 }
 
 function spawnItem() {
