@@ -85,6 +85,34 @@ const ITEM_TYPES = [
     ...WEAPONS.map(w => ({ name: w.name, icon: w.icon, color: '#ffff00', type: 'weapon', id: w.id }))
 ];
 
+const AVATAR_ABILITIES = {
+    '👽': { name: 'Hover', desc: 'Starts with Laser Lv.1', effect: (p) => p.weapons.laser = 1 },
+    '🤖': { name: 'Titanium', desc: 'Starts with +10 Armor', effect: (p) => p.hp += 10 },
+    '👻': { name: 'Ethereal', desc: 'Double Invincibility time', effect: (p) => p.iFrameMult = 2.0 },
+    '🤠': { name: 'Quickdraw', desc: 'Starts with Gun Lv.2', effect: (p) => p.weapons.gun = 2 },
+    '🐱': { name: 'Agility', desc: 'Moves 30% faster', effect: (p) => p.speed *= 1.3 },
+    '🧙': { name: 'Magic', desc: 'Starts with Staff Lv.2', effect: (p) => p.weapons.staff = 2 },
+    '🥷': { name: 'Sneaky', desc: 'Spies move 20% slower', effect: (p) => p.sneaky = 0.8 },
+    '🧟': { name: 'Undead', desc: 'Heals 1 HP every 20 seconds', effect: (p) => p.regen = 20 },
+    '🧛': { name: 'Lifesteal', desc: '2% chance to heal on kill', effect: (p) => p.lifesteal = 0.02 },
+    '🦄': { name: 'Wealthy', desc: 'Starts with $100', effect: (p) => p.money += 100 },
+    '🐉': { name: 'Dragon Breath', desc: 'Starts with Staff Lv.3', effect: (p) => p.weapons.staff = 3 },
+    '👑': { name: 'Royalty', desc: 'Earns $2 per kill', effect: (p) => p.moneyMult = 2 },
+    '🦅': { name: 'Eagle Eye', desc: 'Starts with Sniper Lv.3', effect: (p) => p.weapons.sniper = 3 },
+    '🦊': { name: 'Sly', desc: 'Moves 50% faster', effect: (p) => p.speed *= 1.5 },
+    '🦁': { name: 'King', desc: 'Spies have 20% less health', effect: (p) => p.enemyHpMult = 0.8 },
+    '🦖': { name: 'Prehistoric', desc: 'Starts with Rocket Lv.3', effect: (p) => p.weapons.rocket = 3 },
+    '🧚': { name: 'Fairy Dust', desc: 'Starts with Orbs Lv.3', effect: (p) => p.weapons.orbs = 3 },
+    '🧞‍♂️': { name: 'Wish', desc: 'Starts with 1 level in EVERY weapon', effect: (p) => { for(let w in p.weapons) p.weapons[w]=1; } },
+    '🦹‍♀️': { name: 'Villain', desc: 'Starts with Poison & Lightning Lv.3', effect: (p) => { p.weapons.poison=3; p.weapons.lightning=3; } }
+};
+
+const LINDSEY_ABILITY = { 
+    name: 'Ultimate Survival', 
+    desc: 'Starts with +20 Armor and all Weapons Lv.2', 
+    effect: (p) => { p.hp += 20; for(let w in p.weapons) p.weapons[w]=2; } 
+};
+
 let player = {};
 let enemies = [];
 let items = [];
@@ -109,7 +137,30 @@ function initMenu() {
             btn.classList.add('locked');
         }
         if (skin.isImage) btn.dataset.type = 'image';
+        
+        // Tooltip for abilities
+        let abilityName, abilityDesc;
+        if (skin.isImage) {
+            abilityName = LINDSEY_ABILITY.name;
+            abilityDesc = LINDSEY_ABILITY.desc;
+        } else {
+            abilityName = AVATAR_ABILITIES[skin.icon]?.name || 'Unknown';
+            abilityDesc = AVATAR_ABILITIES[skin.icon]?.desc || 'No special ability';
+        }
+        btn.title = `Ability: ${abilityName} - ${abilityDesc}`;
+
         avatarSelectionContainer.appendChild(btn);
+    });
+
+    // Add tooltips to standard avatars too
+    document.querySelectorAll('.avatar-btn[data-type="emoji"]').forEach(btn => {
+        if (!btn.dataset.id) {
+            const emoji = btn.textContent.trim();
+            const ab = AVATAR_ABILITIES[emoji];
+            if (ab) {
+                btn.title = `Ability: ${ab.name} - ${ab.desc}`;
+            }
+        }
     });
 
     setupAvatarSelection();
@@ -119,23 +170,29 @@ let avatarIndex = 0;
 let avatarBtns = [];
 function setupAvatarSelection() {
     avatarBtns = Array.from(document.querySelectorAll('.avatar-btn'));
-    avatarBtns[0].classList.add('selected');
+    avatarBtns.forEach(b => b.classList.remove('selected'));
+    if (avatarBtns[0]) avatarBtns[0].classList.add('selected');
 
     // Mouse click support
     avatarBtns.forEach((btn, i) => {
-        btn.addEventListener('click', () => {
-            if (btn.dataset.unlocked === 'true') {
+        // remove old listeners
+        const newBtn = btn.cloneNode(true);
+        btn.parentNode.replaceChild(newBtn, btn);
+        newBtn.addEventListener('click', () => {
+            if (newBtn.dataset.unlocked === 'true') {
                 avatarIndex = i;
                 updateAvatarSelection();
                 selectAvatarAndStart();
             }
         });
     });
+    // re-fetch after cloning
+    avatarBtns = Array.from(document.querySelectorAll('.avatar-btn'));
 }
 
 function updateAvatarSelection() {
     avatarBtns.forEach(btn => btn.classList.remove('selected'));
-    avatarBtns[avatarIndex].classList.add('selected');
+    if (avatarBtns[avatarIndex]) avatarBtns[avatarIndex].classList.add('selected');
 }
 
 function selectAvatarAndStart() {
@@ -199,8 +256,24 @@ function startGame() {
         kills: 0,
         weapons: initialWeapons,
         lastShot: {},
-        invincibility: 0
+        invincibility: 0,
+        // Modifiers for abilities
+        iFrameMult: 1.0,
+        sneaky: 1.0,
+        regen: 0,
+        regenTimer: 0,
+        lifesteal: 0,
+        moneyMult: 1,
+        enemyHpMult: 1.0
     };
+
+    // Apply Avatar Abilities
+    if (isAvatarImage) {
+        LINDSEY_ABILITY.effect(player);
+    } else {
+        const ab = AVATAR_ABILITIES[avatarChoice];
+        if (ab) ab.effect(player);
+    }
     
     enemies = [];
     items = [];
@@ -325,7 +398,7 @@ function buildShopUI() {
                     const mainBtn = document.querySelector(`.avatar-btn[data-id="${s.id}"]`);
                     if (mainBtn) {
                         mainBtn.dataset.unlocked = "true";
-                        mainMenu.classList.remove('locked');
+                        mainBtn.classList.remove('locked');
                     }
                     buildShopUI();
                 }
@@ -382,6 +455,16 @@ function update(dt) {
     if (player.invincibility > 0) player.invincibility -= dt * timeScale;
     if (clockTimer > 0) clockTimer -= dt * timeScale;
 
+    // Regen ability
+    if (player.regen > 0) {
+        player.regenTimer += dt * timeScale;
+        if (player.regenTimer >= player.regen) {
+            player.hp += 1;
+            player.regenTimer = 0;
+            updateHUD();
+        }
+    }
+
     // Move Player
     if (isMoving) {
         const length = Math.sqrt(dx*dx + dy*dy);
@@ -401,11 +484,17 @@ function update(dt) {
         }
     }
 
-    // Spawn Enemies (Scaling)
-    const baseSpawnRate = 0.03 * timeScale;
-    const scaledSpawnRate = baseSpawnRate * (1 + player.kills / 50);
+    // Difficulty Scaling Variables
+    const level = Math.floor(player.kills / 100) + 1;
+    let weaponPower = 0;
+    for (let w in player.weapons) weaponPower += player.weapons[w];
+
+    // Slower spawn rate increase based on level and weapon power instead of pure kills
+    const baseSpawnRate = 0.015 * timeScale; // reduced base spawn rate
+    const scaledSpawnRate = baseSpawnRate * (1 + (level * 0.2) + (weaponPower * 0.05));
+    
     if (Math.random() < scaledSpawnRate) {
-        spawnEnemy();
+        spawnEnemy(level, weaponPower);
     }
 
     for (let i = enemies.length - 1; i >= 0; i--) {
@@ -415,15 +504,17 @@ function update(dt) {
         const dist = Math.sqrt(edx*edx + edy*edy);
         
         if (dist > 0 && clockTimer <= 0) {
-            enemy.x += (edx / dist) * enemy.speed * dt * timeScale;
-            enemy.y += (edy / dist) * enemy.speed * dt * timeScale;
+            // Apply Sneaky ability (slows down enemies)
+            const speedMod = enemy.speed * player.sneaky;
+            enemy.x += (edx / dist) * speedMod * dt * timeScale;
+            enemy.y += (edy / dist) * speedMod * dt * timeScale;
         }
 
         // Poison Damage
         poisons.forEach(puddle => {
             const pDist = Math.hypot(puddle.x - enemy.x, puddle.y - enemy.y);
             if (pDist < puddle.radius + enemy.radius) {
-                enemy.hp -= 2 * dt * timeScale; // Damage over time
+                enemy.hp -= 2 * dt * timeScale; 
             }
         });
 
@@ -435,7 +526,7 @@ function update(dt) {
         // Collision with player
         if (dist < player.radius + enemy.radius && player.invincibility <= 0) {
             player.hp -= 1;
-            player.invincibility = 1.0; 
+            player.invincibility = 1.0 * player.iFrameMult; 
             updateHUD();
             if (player.hp <= 0) { endGame(); return; }
         }
@@ -454,17 +545,16 @@ function update(dt) {
         p.y += p.vy * dt * timeScale;
         p.life -= dt * timeScale;
 
-        // Orbiting Orbs special logic
+        // Orbiting Orbs
         if (p.type === 'orb') {
             p.angle += p.speed * dt * timeScale;
             p.x = player.x + Math.cos(p.angle) * p.distance;
             p.y = player.y + Math.sin(p.angle) * p.distance;
         }
 
-        // Boomerang special logic
+        // Boomerang
         if (p.type === 'boomerang') {
             if (p.life < p.maxLife / 2) {
-                // Return to player
                 const dx = player.x - p.x;
                 const dy = player.y - p.y;
                 const dist = Math.hypot(dx, dy);
@@ -472,13 +562,12 @@ function update(dt) {
                     p.vx = (dx / dist) * p.speed;
                     p.vy = (dy / dist) * p.speed;
                 }
-                if (dist < player.radius) { p.life = 0; } // caught
+                if (dist < player.radius) { p.life = 0; }
             }
         }
 
         if (p.life <= 0) {
             if (p.type === 'rocket') {
-                // AoE Explosion
                 enemies.forEach((e, ei) => {
                     if (Math.hypot(e.x - p.x, e.y - p.y) < p.radius * 5) {
                         e.hp -= p.damage;
@@ -498,7 +587,7 @@ function update(dt) {
                 if (e.hp <= 0) killEnemy(j);
                 
                 if (p.type === 'rocket') {
-                    p.life = 0; // Trigger explosion next frame
+                    p.life = 0; 
                 } else if (!p.pierce && p.type !== 'orb') {
                     projectiles.splice(i, 1);
                     break;
@@ -516,7 +605,7 @@ function update(dt) {
         if (Math.hypot(player.x - item.x, player.y - item.y) < player.radius + item.radius) {
             if (item.type.type === 'weapon') {
                 if (player.weapons[item.type.id] === 0) {
-                    player.weapons[item.type.id] = 1; // Unlocks it
+                    player.weapons[item.type.id] = 1; 
                 }
             } else if (item.type.name === 'Armor') {
                 player.hp += 3;
@@ -532,7 +621,7 @@ function update(dt) {
     if (player.kills >= shopThreshold) {
         openShop();
         shopThreshold += shopStep;
-        shopStep += 5; // Scale difficulty of getting to shop
+        shopStep += 5; 
     }
 
     // Weapons Auto-Fire
@@ -598,7 +687,6 @@ function update(dt) {
         if (lvl > 0 && survivalTime - (player.lastShot.laser || 0) > 1.5 / lvl) {
             nearest.hp -= 5 + lvl;
             if (nearest.hp <= 0) killEnemy(enemies.indexOf(nearest));
-            // Visual only projectile (short life)
             projectiles.push({ type: 'laser', x: nearest.x, y: nearest.y, vx:0, vy:0, radius: 2, color: 'cyan', life: 0.1, damage: 0 });
             player.lastShot.laser = survivalTime;
         }
@@ -627,7 +715,6 @@ function update(dt) {
             const target = enemies[Math.floor(Math.random() * enemies.length)];
             target.hp -= 10;
             if (target.hp <= 0) killEnemy(enemies.indexOf(target));
-            // Visual
             projectiles.push({ type: 'lightning', x: target.x, y: target.y, vx:0, vy:0, radius: 20, color: 'yellow', life: 0.2, damage: 0 });
             player.lastShot.lightning = survivalTime;
         }
@@ -636,7 +723,6 @@ function update(dt) {
     // Orbs Continuous
     let lvl = player.weapons.orbs;
     if (lvl > 0) {
-        // Clear old orbs
         projectiles = projectiles.filter(p => p.type !== 'orb');
         const numOrbs = lvl + 1;
         for (let i = 0; i < numOrbs; i++) {
@@ -661,12 +747,18 @@ function killEnemy(index) {
     if (index > -1 && index < enemies.length) {
         enemies.splice(index, 1);
         player.kills++;
-        player.money++;
+        player.money += 1 * player.moneyMult;
+        
+        // Lifesteal ability
+        if (player.lifesteal > 0 && Math.random() < player.lifesteal) {
+            player.hp += 1;
+        }
+        
         updateHUD();
     }
 }
 
-function spawnEnemy() {
+function spawnEnemy(level, weaponPower) {
     let x, y;
     if (Math.random() < 0.5) {
         x = Math.random() < 0.5 ? -30 : canvas.width + 30;
@@ -677,21 +769,25 @@ function spawnEnemy() {
     }
 
     let hp = 1;
-    let speed = 100 + Math.random() * 50;
+    // Base speed = 100. Scale up with level and weapon power.
+    let speed = (100 + Math.random() * 50) * (1 + (level * 0.1) + (weaponPower * 0.02));
     let radius = 18;
     let icon = '🕵️';
 
     // Scaling Enemy Types
-    if (player.kills > 50 && Math.random() < 0.2) {
+    if (level > 1 && Math.random() < 0.2) {
         icon = '👹'; // Brute
-        hp = 5;
-        speed = 60;
+        hp = 5 * (1 + level * 0.5);
+        speed *= 0.6;
         radius = 25;
-    } else if (player.kills > 100 && Math.random() < 0.2) {
+    } else if (level > 2 && Math.random() < 0.2) {
         icon = '🥷'; // Assassin
-        hp = 2;
-        speed = 200;
+        hp = 2 * (1 + level * 0.2);
+        speed *= 2.0;
     }
+
+    // Apply Avatar Global Enemy Modifiers
+    hp *= player.enemyHpMult;
 
     enemies.push({ x, y, radius, speed, hp, maxHp: hp, icon });
 }
