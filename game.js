@@ -116,11 +116,21 @@ const AVATAR_ABILITIES = {
     'lindsey': { name: 'Ultimate Survival (Dev AI)', desc: 'Starts with +50 Armor and all Weapons Lv.3', effect: (p) => { p.hp += 50; for(let w in p.weapons) p.weapons[w]=3; }, onLevelUp: (p) => { p.hp += 10; p.speed += 20; p.lifesteal += 0.05; for(let w in p.weapons) p.weapons[w]++; } }
 };
 
+const BIOMES = [
+    { name: "Forest", bg: '#1e3814', grid: 'rgba(0,255,0,0.1)', icons: ['🌲', '🌳', '🪨'] },
+    { name: "Desert", bg: '#d2b48c', grid: 'rgba(200,100,0,0.2)', icons: ['🌵', '🪨'] },
+    { name: "Snow", bg: '#e0f7fa', grid: 'rgba(0,0,255,0.1)', icons: ['⛄', '🌲', '🧊'] },
+    { name: "Volcanic", bg: '#301010', grid: 'rgba(255,0,0,0.2)', icons: ['🌋', '🪨'] },
+    { name: "Cyber", bg: '#100b1a', grid: 'rgba(255,0,255,0.2)', icons: ['🔮', '🕋'] }
+];
+
 let player = {};
 let enemies = [];
 let items = [];
 let projectiles = [];
 let poisons = [];
+let obstacles = [];
+let currentBiomeIndex = 0;
 
 // Unlocked skins
 let unlockedSkins = JSON.parse(localStorage.getItem('unlockedSkins') || '{}');
@@ -257,6 +267,48 @@ window.addEventListener('keydown', (e) => {
 // --- Core Functions ---
 let avatarChoiceIcon = '';
 
+function generateObstacles(biome) {
+    obstacles = [];
+    const numObstacles = 15 + Math.floor(Math.random() * 10);
+    for(let i=0; i<numObstacles; i++) {
+        let ox, oy, valid;
+        let tries = 0;
+        do {
+            ox = Math.random() * (canvas.width - 100) + 50;
+            oy = Math.random() * (canvas.height - 100) + 50;
+            // keep away from exact center where player spawns
+            const distToPlayer = Math.hypot(ox - canvas.width/2, oy - canvas.height/2);
+            valid = distToPlayer > 150;
+            
+            // keep away from other obstacles
+            for(let j=0; j<obstacles.length; j++) {
+                if (Math.hypot(ox - obstacles[j].x, oy - obstacles[j].y) < 60) valid = false;
+            }
+            tries++;
+        } while(!valid && tries < 50);
+        
+        if(valid) {
+            obstacles.push({
+                x: ox, y: oy,
+                radius: 25 + Math.random() * 15,
+                icon: biome.icons[Math.floor(Math.random() * biome.icons.length)]
+            });
+        }
+    }
+}
+
+function resolveCollision(entity, obj) {
+    const dx = entity.x - obj.x;
+    const dy = entity.y - obj.y;
+    const dist = Math.hypot(dx, dy);
+    const minD = entity.radius + obj.radius;
+    if (dist < minD && dist > 0) {
+        const overlap = minD - dist;
+        entity.x += (dx / dist) * overlap;
+        entity.y += (dy / dist) * overlap;
+    }
+}
+
 function startGame() {
     isPlaying = true;
     isShopOpen = false;
@@ -288,7 +340,8 @@ function startGame() {
         lifesteal: 0,
         moneyMult: 1,
         enemyHpMult: 1.0,
-        avatarLevel: 1
+        avatarLevel: 1,
+        currentLevel: 1
     };
 
     // Apply Avatar Abilities to the fresh player object
@@ -300,6 +353,9 @@ function startGame() {
     items = [];
     projectiles = [];
     poisons = [];
+    
+    currentBiomeIndex = 0;
+    generateObstacles(BIOMES[currentBiomeIndex]);
     
     mainMenu.classList.add('hidden');
     shopMenu.classList.add('hidden');
@@ -501,6 +557,8 @@ function update(dt) {
         player.x = Math.max(player.radius, Math.min(canvas.width - player.radius, player.x));
         player.y = Math.max(player.radius, Math.min(canvas.height - player.radius, player.y));
 
+        obstacles.forEach(obs => resolveCollision(player, obs));
+
         // Massively reduce item spawn rate (was 250, now 500) and drop utility+weapons
         if (distanceMoved > 500) { 
             distanceMoved = 0;
@@ -531,6 +589,7 @@ function update(dt) {
             const speedMod = enemy.speed * player.sneaky;
             enemy.x += (edx / dist) * speedMod * dt * timeScale;
             enemy.y += (edy / dist) * speedMod * dt * timeScale;
+            obstacles.forEach(obs => resolveCollision(enemy, obs));
         }
 
         // Poison Damage
@@ -795,6 +854,14 @@ function killEnemy(index) {
                 ab.onLevelUp(player);
             }
         }
+
+        // Level Up Trigger for Biomes (Every 100 kills)
+        const newLevel = Math.floor(player.kills / 100) + 1;
+        if (newLevel > player.currentLevel) {
+            player.currentLevel = newLevel;
+            currentBiomeIndex = (newLevel - 1) % BIOMES.length;
+            generateObstacles(BIOMES[currentBiomeIndex]);
+        }
         
         updateHUD();
     }
@@ -881,11 +948,12 @@ function getCachedImage(src) {
 }
 
 function draw() {
-    ctx.fillStyle = '#0d1117';
+    const biome = BIOMES[currentBiomeIndex] || BIOMES[0];
+    ctx.fillStyle = biome.bg;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     // Grid
-    ctx.strokeStyle = 'rgba(0, 240, 255, 0.1)';
+    ctx.strokeStyle = biome.grid;
     ctx.lineWidth = 1;
     const gridSize = 50;
     for (let x = 0; x < canvas.width; x += gridSize) {
@@ -894,6 +962,14 @@ function draw() {
     for (let y = 0; y < canvas.height; y += gridSize) {
         ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
     }
+
+    // Draw Obstacles
+    obstacles.forEach(obs => {
+        ctx.font = `${obs.radius * 2}px Arial`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(obs.icon, obs.x, obs.y + obs.radius/4); // Slight vertical shift to look planted
+    });
 
     // Poisons
     poisons.forEach(p => {
