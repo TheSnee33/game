@@ -327,7 +327,7 @@ function startGame() {
         y: canvas.height / 2,
         radius: 20,
         speed: 300,
-        hp: 1,
+        hp: 10,
         money: 0,
         kills: 0,
         weapons: JSON.parse(JSON.stringify(initialWeapons)),
@@ -571,8 +571,9 @@ function update(dt) {
     let weaponPower = 0;
     for (let w in player.weapons) weaponPower += player.weapons[w];
 
-    const baseSpawnRate = 0.015 * timeScale; 
-    const scaledSpawnRate = baseSpawnRate * (1 + (level * 0.3) + (weaponPower * 0.08));
+    // Slower base spawn rate for an easier start
+    const baseSpawnRate = 0.005 * timeScale; 
+    const scaledSpawnRate = baseSpawnRate * (1 + (level * 0.5) + (weaponPower * 0.1));
     
     if (Math.random() < scaledSpawnRate) {
         spawnEnemy(level, weaponPower);
@@ -639,7 +640,7 @@ function update(dt) {
         }
 
         // Boomerang
-        if (p.type === 'boomerang') {
+        if (p.wType === 'boomerang') {
             if (p.life < p.maxLife / 2) {
                 const dx = player.x - p.x;
                 const dy = player.y - p.y;
@@ -653,17 +654,21 @@ function update(dt) {
         }
 
         if (p.life <= 0) {
-            if (p.type === 'rocket') {
+            if (p.wType === 'rocket' && p.type !== 'explosion') {
                 enemies.forEach((e, ei) => {
                     if (Math.hypot(e.x - p.x, e.y - p.y) < p.radius * 5) {
                         e.hp -= p.damage;
                         if (e.hp <= 0) killEnemy(ei);
                     }
                 });
+                // spawn explosion visual
+                projectiles.push({ type: 'explosion', wType: 'explosion', x: p.x, y: p.y, vx:0, vy:0, radius: p.radius * 5, life: 0.5, maxLife: 0.5, damage: 0 });
             }
             projectiles.splice(i, 1);
             continue;
         }
+
+        if (p.type === 'explosion') continue; // Explosions don't do collision damage over time, just visuals
 
         for (let j = enemies.length - 1; j >= 0; j--) {
             const e = enemies[j];
@@ -672,9 +677,9 @@ function update(dt) {
                 e.hp -= p.damage || 1;
                 if (e.hp <= 0) killEnemy(j);
                 
-                if (p.type === 'rocket') {
+                if (p.wType === 'rocket') {
                     p.life = 0; 
-                } else if (!p.pierce && p.type !== 'orb') {
+                } else if (!p.pierce && p.wType !== 'orb') {
                     projectiles.splice(i, 1);
                     break;
                 }
@@ -724,7 +729,7 @@ function update(dt) {
         // Gun
         let lvl = player.weapons.gun;
         if (lvl > 0 && survivalTime - (player.lastShot.gun || 0) > 0.5 / (1 + 0.25 * (lvl - 1))) {
-            fireProjectile(player.x, player.y, angleToNearest, 800, 5, '#ffff00', 2, false);
+            fireProjectile(player.x, player.y, angleToNearest, 800, 5, '#ffff00', 2, false, 2, 'gun');
             player.lastShot.gun = survivalTime;
         }
 
@@ -734,7 +739,7 @@ function update(dt) {
             const spread = 0.4;
             const startAngle = angleToNearest - (spread * (lvl - 1)) / 2;
             for (let i = 0; i < lvl; i++) {
-                fireProjectile(player.x, player.y, startAngle + i * spread, 400, 15, '#ff00ff', 3, true);
+                fireProjectile(player.x, player.y, startAngle + i * spread, 400, 15, '#ff00ff', 3, true, 1, 'staff');
             }
             player.lastShot.staff = survivalTime;
         }
@@ -744,7 +749,7 @@ function update(dt) {
         if (lvl > 0 && survivalTime - (player.lastShot.shotgun || 0) > 1.0 / (1 + 0.1 * lvl)) {
             for (let i = 0; i < 5 + Math.floor(lvl/2); i++) {
                 const spread = (Math.random() - 0.5) * 1.5;
-                fireProjectile(player.x, player.y, angleToNearest + spread, 600, 4, '#ffaa00', 0.5, false, 2);
+                fireProjectile(player.x, player.y, angleToNearest + spread, 600, 4, '#ffaa00', 0.5, false, 2, 'shotgun');
             }
             player.lastShot.shotgun = survivalTime;
         }
@@ -752,7 +757,7 @@ function update(dt) {
         // Sniper
         lvl = player.weapons.sniper;
         if (lvl > 0 && survivalTime - (player.lastShot.sniper || 0) > 2.0 / (1 + 0.2 * lvl)) {
-            fireProjectile(player.x, player.y, angleToNearest, 1500, 3, '#ffffff', 2, true, 5 + lvl);
+            fireProjectile(player.x, player.y, angleToNearest, 1500, 3, '#ffffff', 2, true, 5 + lvl, 'sniper');
             player.lastShot.sniper = survivalTime;
         }
 
@@ -761,9 +766,9 @@ function update(dt) {
         if (lvl > 0 && survivalTime - (player.lastShot.boomerang || 0) > 2.0) {
             for (let i = 0; i < lvl; i++) {
                 projectiles.push({
-                    type: 'boomerang', x: player.x, y: player.y,
+                    type: 'normal', wType: 'boomerang', x: player.x, y: player.y,
                     vx: Math.cos(angleToNearest) * 500, vy: Math.sin(angleToNearest) * 500, speed: 500,
-                    radius: 12, color: '#00aaff', life: 2, maxLife: 2, pierce: true, damage: 2
+                    radius: 15, color: '#00aaff', life: 2, maxLife: 2, pierce: true, damage: 2
                 });
             }
             player.lastShot.boomerang = survivalTime;
@@ -774,7 +779,7 @@ function update(dt) {
         if (lvl > 0 && survivalTime - (player.lastShot.laser || 0) > 1.5 / lvl) {
             nearest.hp -= 5 + lvl;
             if (nearest.hp <= 0) killEnemy(enemies.indexOf(nearest));
-            projectiles.push({ type: 'laser', x: nearest.x, y: nearest.y, vx:0, vy:0, radius: 2, color: 'cyan', life: 0.1, damage: 0 });
+            projectiles.push({ type: 'laser', wType: 'laser', x: nearest.x, y: nearest.y, vx:0, vy:0, radius: 2, color: 'cyan', life: 0.2, damage: 0 });
             player.lastShot.laser = survivalTime;
         }
 
@@ -782,7 +787,7 @@ function update(dt) {
         lvl = player.weapons.rocket;
         if (lvl > 0 && survivalTime - (player.lastShot.rocket || 0) > 2.5) {
             projectiles.push({
-                type: 'rocket', x: player.x, y: player.y,
+                type: 'normal', wType: 'rocket', x: player.x, y: player.y,
                 vx: Math.cos(angleToNearest) * 300, vy: Math.sin(angleToNearest) * 300,
                 radius: 8, color: '#ff4400', life: 3, pierce: false, damage: 3 + lvl
             });
@@ -802,7 +807,7 @@ function update(dt) {
             const target = enemies[Math.floor(Math.random() * enemies.length)];
             target.hp -= 10;
             if (target.hp <= 0) killEnemy(enemies.indexOf(target));
-            projectiles.push({ type: 'lightning', x: target.x, y: target.y, vx:0, vy:0, radius: 20, color: 'yellow', life: 0.2, damage: 0 });
+            projectiles.push({ type: 'normal', wType: 'lightning', x: target.x, y: target.y, vx:0, vy:0, radius: 20, color: 'yellow', life: 0.3, damage: 0 });
             player.lastShot.lightning = survivalTime;
         }
     }
@@ -810,21 +815,21 @@ function update(dt) {
     // Orbs Continuous
     let lvl = player.weapons.orbs;
     if (lvl > 0) {
-        projectiles = projectiles.filter(p => p.type !== 'orb');
+        projectiles = projectiles.filter(p => p.wType !== 'orb');
         const numOrbs = lvl + 1;
         for (let i = 0; i < numOrbs; i++) {
             projectiles.push({
-                type: 'orb', x: player.x, y: player.y, vx: 0, vy: 0,
-                radius: 10, color: '#aa00ff', life: 100, pierce: true, damage: 0.5,
+                type: 'normal', wType: 'orb', x: player.x, y: player.y, vx: 0, vy: 0,
+                radius: 12, color: '#aa00ff', life: 100, pierce: true, damage: 0.5,
                 angle: (Math.PI * 2 / numOrbs) * i + (survivalTime * 2), distance: 80, speed: 2
             });
         }
     }
 }
 
-function fireProjectile(x, y, angle, speed, radius, color, life, pierce, damage = 1) {
+function fireProjectile(x, y, angle, speed, radius, color, life, pierce, damage = 1, wType = 'normal') {
     projectiles.push({
-        type: 'normal', x, y,
+        type: 'normal', wType, x, y,
         vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
         radius, color, life, pierce, damage
     });
@@ -975,8 +980,16 @@ function draw() {
     poisons.forEach(p => {
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.radius, 0, Math.PI*2);
-        ctx.fillStyle = `rgba(0, 255, 0, ${0.3 * (p.life/5)})`;
+        ctx.fillStyle = `rgba(0, 255, 0, ${0.15 * (p.life/5)})`; // Increased transparency
         ctx.fill();
+        
+        // Bubbling animation
+        ctx.fillStyle = `rgba(50, 255, 50, ${0.5 * (p.life/5)})`;
+        for(let i=0; i<3; i++) {
+            const bx = p.x + Math.sin(survivalTime * 3 + i) * p.radius * 0.5;
+            const by = p.y + Math.cos(survivalTime * 2 + i) * p.radius * 0.5;
+            ctx.beginPath(); ctx.arc(bx, by, p.radius * 0.1, 0, Math.PI*2); ctx.fill();
+        }
     });
 
     items.forEach(item => {
@@ -985,7 +998,10 @@ function draw() {
         ctx.textBaseline = "middle";
         ctx.shadowBlur = 10;
         ctx.shadowColor = item.type.color;
-        ctx.fillText(item.type.icon, item.x, item.y);
+        
+        // Floating item animation
+        const floatY = item.y + Math.sin(survivalTime * 4) * 5;
+        ctx.fillText(item.type.icon, item.x, floatY);
         ctx.shadowBlur = 0; 
     });
 
@@ -995,18 +1011,83 @@ function draw() {
             ctx.moveTo(player.x, player.y);
             ctx.lineTo(p.x, p.y);
             ctx.strokeStyle = p.color;
-            ctx.lineWidth = 5;
+            ctx.lineWidth = 5 + Math.sin(survivalTime * 20) * 3; // Pulsing laser
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = p.color;
             ctx.stroke();
+            ctx.shadowBlur = 0;
             return;
         }
         
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-        ctx.fillStyle = p.color;
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = p.color;
-        ctx.fill();
-        ctx.shadowBlur = 0;
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        
+        if (p.wType === 'staff') {
+            ctx.font = `${p.radius * 2}px Arial`;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText('🔥', 0, 0);
+        } else if (p.wType === 'boomerang') {
+            ctx.rotate(survivalTime * 15);
+            ctx.font = `${p.radius * 2}px Arial`;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText('🪃', 0, 0);
+        } else if (p.wType === 'rocket') {
+            const angle = Math.atan2(p.vy, p.vx);
+            ctx.rotate(angle + Math.PI/4); // Rotate rocket emoji properly
+            ctx.font = `${p.radius * 2.5}px Arial`;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText('🚀', 0, 0);
+        } else if (p.wType === 'orb') {
+            ctx.rotate(survivalTime * -5);
+            ctx.font = `${p.radius * 2}px Arial`;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText('🔮', 0, 0);
+        } else if (p.wType === 'explosion') {
+            ctx.font = `${p.radius * 2}px Arial`;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.globalAlpha = p.life / p.maxLife; // fade out
+            ctx.fillText('💥', 0, 0);
+        } else if (p.wType === 'lightning') {
+            ctx.beginPath();
+            ctx.moveTo(0, -500);
+            for(let i=1; i<5; i++) {
+                ctx.lineTo((Math.random() - 0.5)*50, -500 + i*100);
+            }
+            ctx.lineTo(0, 0);
+            ctx.strokeStyle = 'rgba(255, 255, 0, 0.8)';
+            ctx.lineWidth = p.radius / 2;
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.arc(0, 0, p.radius, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(255, 255, 0, ${p.life * 2})`;
+            ctx.fill();
+        } else {
+            // Standard generic bullet (Gun, Shotgun, Sniper)
+            ctx.rotate(Math.atan2(p.vy, p.vx));
+            ctx.beginPath();
+            ctx.moveTo(-p.radius, 0);
+            ctx.lineTo(p.radius, 0);
+            ctx.strokeStyle = p.color;
+            ctx.lineWidth = p.radius;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+            
+            if (p.wType === 'sniper') {
+                ctx.beginPath();
+                ctx.moveTo(-p.radius * 15, 0);
+                ctx.lineTo(-p.radius, 0);
+                ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+                ctx.lineWidth = p.radius * 0.8;
+                ctx.stroke();
+            }
+        }
+        ctx.restore();
     });
 
     enemies.forEach(enemy => {
