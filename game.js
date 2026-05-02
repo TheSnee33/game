@@ -35,6 +35,7 @@ let survivalTime = 0;
 let distanceMoved = 0;
 let avatarChoice = '👽';
 let lastShopKillCount = 0;
+let clockTimer = 0;
 
 // Input
 const keys = {};
@@ -58,7 +59,8 @@ let projectiles = [];
 const ITEM_TYPES = [
     { name: 'Gun', icon: '🔫', color: '#ffff00' },
     { name: 'Staff', icon: '🪄', color: '#ff00ff' },
-    { name: 'Armor', icon: '🛡️', color: '#00ff00' }
+    { name: 'Armor', icon: '🛡️', color: '#00ff00' },
+    { name: 'Clock', icon: '⏱️', color: '#00ffff' }
 ];
 
 // --- Core Functions ---
@@ -70,6 +72,7 @@ function startGame(avatar) {
     survivalTime = 0;
     distanceMoved = 0;
     lastShopKillCount = 0;
+    clockTimer = 0;
     
     player = {
         x: canvas.width / 2,
@@ -125,8 +128,8 @@ function closeShop() {
 
 // UI Listeners
 avatarBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-        startGame(btn.innerText);
+    btn.addEventListener('click', function() {
+        startGame(this.textContent.trim());
     });
 });
 
@@ -207,6 +210,9 @@ function update(dt) {
     if (player.invincibility > 0) {
         player.invincibility -= dt * timeScale;
     }
+    if (clockTimer > 0) {
+        clockTimer -= dt * timeScale; // Using timeScale so it pauses longer when slowmo
+    }
 
     // 2. Move Player
     if (isMoving) {
@@ -243,7 +249,7 @@ function update(dt) {
         const edy = player.y - enemy.y;
         const dist = Math.sqrt(edx*edx + edy*edy);
         
-        if (dist > 0) {
+        if (dist > 0 && clockTimer <= 0) {
             enemy.x += (edx / dist) * enemy.speed * dt * timeScale;
             enemy.y += (edy / dist) * enemy.speed * dt * timeScale;
         }
@@ -314,6 +320,8 @@ function update(dt) {
                 player.staffLevel++;
             } else if (item.type.name === 'Armor') {
                 player.hp += 3;
+            } else if (item.type.name === 'Clock') {
+                clockTimer = 5.0; // Freeze enemies for 5 seconds
             }
             items.splice(i, 1);
         }
