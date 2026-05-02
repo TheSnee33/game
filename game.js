@@ -710,12 +710,6 @@ function update(dt) {
         }
     }
 
-    // Check Auto Shop Trigger
-    if (shopThresholds.length > 0 && player.kills >= shopThresholds[0]) {
-        shopThresholds.shift(); // Remove the threshold we just hit
-        openShop();
-    }
-
     // Weapons Auto-Fire
     if (enemies.length > 0) {
         let nearest = enemies[0];
