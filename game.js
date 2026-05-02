@@ -32,17 +32,23 @@ let lastTime = 0;
 let timeScale = 0.1; 
 let survivalTime = 0; 
 let distanceMoved = 0;
-let avatarChoice = '👽';
+let avatarChoice = 'alien';
 let isAvatarImage = false;
 let clockTimer = 0;
 
 // Scaling State
-let shopThreshold = 25;
-let shopStep = 30;
+let shopThresholds = [25, 55, 90];
 
 // Input
 const keys = {};
-window.addEventListener('keydown', (e) => { keys[e.key] = true; });
+window.addEventListener('keydown', (e) => { 
+    keys[e.key] = true; 
+    
+    // Shop manual open
+    if (e.key === 'Enter' && isPlaying && !isShopOpen) {
+        openShop();
+    }
+});
 window.addEventListener('keyup', (e) => { keys[e.key] = false; });
 window.addEventListener('resize', resizeCanvas);
 
@@ -69,14 +75,14 @@ const WEAPONS = [
 const PREMIUM_SKINS = [
     { id: 'dragon', icon: '🐉', price: 500 },
     { id: 'crown', icon: '👑', price: 800 },
-    { id: 'lindsey', icon: '<img src="lindsey.png">', isImage: true, price: 1000 },
-    { id: 'eagle', icon: '🦅', price: 2000 },
-    { id: 'fox', icon: '🦊', price: 2500 },
+    { id: 'eagle', icon: '🦅', price: 1500 },
+    { id: 'fox', icon: '🦊', price: 2000 },
     { id: 'lion', icon: '🦁', price: 3000 },
     { id: 'rex', icon: '🦖', price: 4000 },
     { id: 'fairy', icon: '🧚', price: 5000 },
-    { id: 'genie', icon: '🧞‍♂️', price: 7500 },
-    { id: 'villain', icon: '🦹‍♀️', price: 10000 }
+    { id: 'genie', icon: '🧞‍♂️', price: 6000 },
+    { id: 'villain', icon: '🦹‍♀️', price: 7500 },
+    { id: 'lindsey', icon: '<img src="lindsey.png">', isImage: true, price: 10000 }
 ];
 
 const ITEM_TYPES = [
@@ -86,31 +92,26 @@ const ITEM_TYPES = [
 ];
 
 const AVATAR_ABILITIES = {
-    '👽': { name: 'Hover', desc: 'Starts with Laser Lv.1', effect: (p) => p.weapons.laser = 1 },
-    '🤖': { name: 'Titanium', desc: 'Starts with +10 Armor', effect: (p) => p.hp += 10 },
-    '👻': { name: 'Ethereal', desc: 'Double Invincibility time', effect: (p) => p.iFrameMult = 2.0 },
-    '🤠': { name: 'Quickdraw', desc: 'Starts with Gun Lv.2', effect: (p) => p.weapons.gun = 2 },
-    '🐱': { name: 'Agility', desc: 'Moves 30% faster', effect: (p) => p.speed *= 1.3 },
-    '🧙': { name: 'Magic', desc: 'Starts with Staff Lv.2', effect: (p) => p.weapons.staff = 2 },
-    '🥷': { name: 'Sneaky', desc: 'Spies move 20% slower', effect: (p) => p.sneaky = 0.8 },
-    '🧟': { name: 'Undead', desc: 'Heals 1 HP every 20 seconds', effect: (p) => p.regen = 20 },
-    '🧛': { name: 'Lifesteal', desc: '2% chance to heal on kill', effect: (p) => p.lifesteal = 0.02 },
-    '🦄': { name: 'Wealthy', desc: 'Starts with $100', effect: (p) => p.money += 100 },
-    '🐉': { name: 'Dragon Breath', desc: 'Starts with Staff Lv.3', effect: (p) => p.weapons.staff = 3 },
-    '👑': { name: 'Royalty', desc: 'Earns $2 per kill', effect: (p) => p.moneyMult = 2 },
-    '🦅': { name: 'Eagle Eye', desc: 'Starts with Sniper Lv.3', effect: (p) => p.weapons.sniper = 3 },
-    '🦊': { name: 'Sly', desc: 'Moves 50% faster', effect: (p) => p.speed *= 1.5 },
-    '🦁': { name: 'King', desc: 'Spies have 20% less health', effect: (p) => p.enemyHpMult = 0.8 },
-    '🦖': { name: 'Prehistoric', desc: 'Starts with Rocket Lv.3', effect: (p) => p.weapons.rocket = 3 },
-    '🧚': { name: 'Fairy Dust', desc: 'Starts with Orbs Lv.3', effect: (p) => p.weapons.orbs = 3 },
-    '🧞‍♂️': { name: 'Wish', desc: 'Starts with 1 level in EVERY weapon', effect: (p) => { for(let w in p.weapons) p.weapons[w]=1; } },
-    '🦹‍♀️': { name: 'Villain', desc: 'Starts with Poison & Lightning Lv.3', effect: (p) => { p.weapons.poison=3; p.weapons.lightning=3; } }
-};
-
-const LINDSEY_ABILITY = { 
-    name: 'Ultimate Survival', 
-    desc: 'Starts with +20 Armor and all Weapons Lv.2', 
-    effect: (p) => { p.hp += 20; for(let w in p.weapons) p.weapons[w]=2; } 
+    'alien': { name: 'Hover', desc: 'Starts with Laser Lv.1', effect: (p) => p.weapons.laser = 1, onLevelUp: (p) => p.weapons.laser++ },
+    'robot': { name: 'Titanium', desc: 'Starts with +10 Armor', effect: (p) => p.hp += 10, onLevelUp: (p) => p.hp += 5 },
+    'ghost': { name: 'Ethereal', desc: 'Double Invincibility time', effect: (p) => p.iFrameMult = 2.0, onLevelUp: (p) => p.iFrameMult += 0.5 },
+    'cowboy': { name: 'Quickdraw', desc: 'Starts with Gun Lv.2', effect: (p) => p.weapons.gun = 2, onLevelUp: (p) => p.weapons.gun++ },
+    'cat': { name: 'Agility', desc: 'Moves 30% faster', effect: (p) => p.speed *= 1.3, onLevelUp: (p) => p.speed += 20 },
+    'wizard': { name: 'Magic', desc: 'Starts with Staff Lv.2', effect: (p) => p.weapons.staff = 2, onLevelUp: (p) => p.weapons.staff++ },
+    'ninja': { name: 'Sneaky', desc: 'Spies move 20% slower', effect: (p) => p.sneaky = 0.8, onLevelUp: (p) => p.sneaky = Math.max(0.2, p.sneaky - 0.05) },
+    'zombie': { name: 'Undead', desc: 'Heals 1 HP every 20 seconds', effect: (p) => p.regen = 20, onLevelUp: (p) => p.regen = Math.max(2, p.regen - 2) },
+    'vampire': { name: 'Lifesteal', desc: '2% chance to heal on kill', effect: (p) => p.lifesteal = 0.02, onLevelUp: (p) => p.lifesteal += 0.01 },
+    'unicorn': { name: 'Wealthy', desc: 'Starts with $100', effect: (p) => p.money += 100, onLevelUp: (p) => p.money += 50 },
+    'dragon': { name: 'Dragon Breath', desc: 'Starts with Staff Lv.3', effect: (p) => p.weapons.staff = 3, onLevelUp: (p) => { p.weapons.staff++; p.hp += 2; } },
+    'crown': { name: 'Royalty', desc: 'Earns $2 per kill', effect: (p) => p.moneyMult = 2, onLevelUp: (p) => p.moneyMult += 0.5 },
+    'eagle': { name: 'Eagle Eye', desc: 'Starts with Sniper Lv.3', effect: (p) => p.weapons.sniper = 3, onLevelUp: (p) => p.weapons.sniper++ },
+    'fox': { name: 'Sly', desc: 'Moves 50% faster', effect: (p) => p.speed *= 1.5, onLevelUp: (p) => { p.speed += 20; p.sneaky -= 0.02; } },
+    'lion': { name: 'King', desc: 'Spies have 20% less health', effect: (p) => p.enemyHpMult = 0.8, onLevelUp: (p) => p.enemyHpMult = Math.max(0.2, p.enemyHpMult - 0.05) },
+    'rex': { name: 'Prehistoric', desc: 'Starts with Rocket Lv.3', effect: (p) => p.weapons.rocket = 3, onLevelUp: (p) => { p.weapons.rocket++; p.hp += 5; } },
+    'fairy': { name: 'Fairy Dust', desc: 'Starts with Orbs Lv.3', effect: (p) => p.weapons.orbs = 3, onLevelUp: (p) => p.weapons.orbs++ },
+    'genie': { name: 'Wish', desc: 'Starts with 1 level in EVERY weapon', effect: (p) => { for(let w in p.weapons) p.weapons[w]=1; }, onLevelUp: (p) => { const w = Object.keys(p.weapons); p.weapons[w[Math.floor(Math.random() * w.length)]]++; } },
+    'villain': { name: 'Villain', desc: 'Starts with Poison & Lightning Lv.3', effect: (p) => { p.weapons.poison=3; p.weapons.lightning=3; }, onLevelUp: (p) => { p.weapons.poison++; p.weapons.lightning++; } },
+    'lindsey': { name: 'Ultimate Survival (Dev AI)', desc: 'Starts with +50 Armor and all Weapons Lv.3', effect: (p) => { p.hp += 50; for(let w in p.weapons) p.weapons[w]=3; }, onLevelUp: (p) => { p.hp += 10; p.speed += 20; p.lifesteal += 0.05; for(let w in p.weapons) p.weapons[w]++; } }
 };
 
 let player = {};
@@ -137,29 +138,15 @@ function initMenu() {
             btn.classList.add('locked');
         }
         if (skin.isImage) btn.dataset.type = 'image';
-        
-        // Tooltip for abilities
-        let abilityName, abilityDesc;
-        if (skin.isImage) {
-            abilityName = LINDSEY_ABILITY.name;
-            abilityDesc = LINDSEY_ABILITY.desc;
-        } else {
-            abilityName = AVATAR_ABILITIES[skin.icon]?.name || 'Unknown';
-            abilityDesc = AVATAR_ABILITIES[skin.icon]?.desc || 'No special ability';
-        }
-        btn.title = `Ability: ${abilityName} - ${abilityDesc}`;
-
         avatarSelectionContainer.appendChild(btn);
     });
 
-    // Add tooltips to standard avatars too
-    document.querySelectorAll('.avatar-btn[data-type="emoji"]').forEach(btn => {
-        if (!btn.dataset.id) {
-            const emoji = btn.textContent.trim();
-            const ab = AVATAR_ABILITIES[emoji];
-            if (ab) {
-                btn.title = `Ability: ${ab.name} - ${ab.desc}`;
-            }
+    // Add tooltips to all avatars
+    document.querySelectorAll('.avatar-btn').forEach(btn => {
+        const id = btn.dataset.id;
+        const ab = AVATAR_ABILITIES[id];
+        if (ab) {
+            btn.title = `Ability: ${ab.name} - ${ab.desc} (Levels up every 75 kills)`;
         }
     });
 
@@ -175,7 +162,6 @@ function setupAvatarSelection() {
 
     // Mouse click support
     avatarBtns.forEach((btn, i) => {
-        // remove old listeners
         const newBtn = btn.cloneNode(true);
         btn.parentNode.replaceChild(newBtn, btn);
         newBtn.addEventListener('click', () => {
@@ -198,12 +184,12 @@ function updateAvatarSelection() {
 function selectAvatarAndStart() {
     const btn = avatarBtns[avatarIndex];
     if (btn.dataset.unlocked === 'true') {
-        if (btn.dataset.type === 'image') {
-            avatarChoice = btn.querySelector('img').src;
-            isAvatarImage = true;
+        avatarChoice = btn.dataset.id;
+        isAvatarImage = btn.dataset.type === 'image';
+        if (isAvatarImage) {
+            avatarChoiceIcon = btn.querySelector('img').src;
         } else {
-            avatarChoice = btn.textContent.trim();
-            isAvatarImage = false;
+            avatarChoiceIcon = btn.textContent.trim();
         }
         startGame();
     }
@@ -232,6 +218,7 @@ window.addEventListener('keydown', (e) => {
 });
 
 // --- Core Functions ---
+let avatarChoiceIcon = '';
 
 function startGame() {
     isPlaying = true;
@@ -240,8 +227,7 @@ function startGame() {
     distanceMoved = 0;
     clockTimer = 0;
     
-    shopThreshold = 25;
-    shopStep = 30;
+    shopThresholds = [25, 55, 90]; // First three automatic shop triggers
 
     let initialWeapons = {};
     WEAPONS.forEach(w => initialWeapons[w.id] = 0);
@@ -264,16 +250,14 @@ function startGame() {
         regenTimer: 0,
         lifesteal: 0,
         moneyMult: 1,
-        enemyHpMult: 1.0
+        enemyHpMult: 1.0,
+        // Leveling
+        avatarLevel: 1
     };
 
     // Apply Avatar Abilities
-    if (isAvatarImage) {
-        LINDSEY_ABILITY.effect(player);
-    } else {
-        const ab = AVATAR_ABILITIES[avatarChoice];
-        if (ab) ab.effect(player);
-    }
+    const ab = AVATAR_ABILITIES[avatarChoice];
+    if (ab) ab.effect(player);
     
     enemies = [];
     items = [];
@@ -421,7 +405,8 @@ function updateHUD() {
     WEAPONS.forEach(w => {
         if (player.weapons[w.id] > 0) activeWeapons.push(`${w.name} Lv.${player.weapons[w.id]}`);
     });
-    currentWeaponsEl.innerText = activeWeapons.length > 0 ? activeWeapons.join(", ") : "None";
+    let abText = `Avatar Level: ${player.avatarLevel}`;
+    currentWeaponsEl.innerText = `${abText} | ` + (activeWeapons.length > 0 ? activeWeapons.join(", ") : "No Weapons");
 }
 
 // --- Game Loop ---
@@ -489,8 +474,7 @@ function update(dt) {
     let weaponPower = 0;
     for (let w in player.weapons) weaponPower += player.weapons[w];
 
-    // Slower spawn rate increase based on level and weapon power instead of pure kills
-    const baseSpawnRate = 0.015 * timeScale; // reduced base spawn rate
+    const baseSpawnRate = 0.015 * timeScale; 
     const scaledSpawnRate = baseSpawnRate * (1 + (level * 0.2) + (weaponPower * 0.05));
     
     if (Math.random() < scaledSpawnRate) {
@@ -617,11 +601,10 @@ function update(dt) {
         }
     }
 
-    // Check Shop Trigger
-    if (player.kills >= shopThreshold) {
+    // Check Auto Shop Trigger
+    if (shopThresholds.length > 0 && player.kills >= shopThresholds[0]) {
+        shopThresholds.shift(); // Remove the threshold we just hit
         openShop();
-        shopThreshold += shopStep;
-        shopStep += 5; 
     }
 
     // Weapons Auto-Fire
@@ -753,6 +736,15 @@ function killEnemy(index) {
         if (player.lifesteal > 0 && Math.random() < player.lifesteal) {
             player.hp += 1;
         }
+
+        // Avatar Level Up (Every 75 Kills)
+        if (player.kills % 75 === 0) {
+            player.avatarLevel++;
+            const ab = AVATAR_ABILITIES[avatarChoice];
+            if (ab && ab.onLevelUp) {
+                ab.onLevelUp(player);
+            }
+        }
         
         updateHUD();
     }
@@ -769,7 +761,6 @@ function spawnEnemy(level, weaponPower) {
     }
 
     let hp = 1;
-    // Base speed = 100. Scale up with level and weapon power.
     let speed = (100 + Math.random() * 50) * (1 + (level * 0.1) + (weaponPower * 0.02));
     let radius = 18;
     let icon = '🕵️';
@@ -889,7 +880,7 @@ function draw() {
             ctx.shadowColor = '#00f0ff';
         }
         if (isAvatarImage) {
-            const img = getCachedImage(avatarChoice);
+            const img = getCachedImage(avatarChoiceIcon);
             if (img.complete) {
                 ctx.save();
                 ctx.beginPath();
@@ -902,7 +893,7 @@ function draw() {
             ctx.font = "32px Arial";
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
-            ctx.fillText(avatarChoice, player.x, player.y);
+            ctx.fillText(avatarChoiceIcon, player.x, player.y);
         }
         ctx.shadowBlur = 0;
     }
