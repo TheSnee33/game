@@ -30,24 +30,26 @@
         <!-- Main Menu -->
         <div id="mainMenu" class="overlay">
             <h1>CHRONO SPIES</h1>
-            <p>Time moves slowly when you stand still...</p>
-            <p>Select your avatar to start:</p>
-            <div class="avatar-selection">
-                <button class="avatar-btn">👽</button>
-                <button class="avatar-btn">🤖</button>
-                <button class="avatar-btn">👻</button>
-                <button class="avatar-btn">🤠</button>
-                <button class="avatar-btn">🐱</button>
-                <button class="avatar-btn">🧙</button>
-                <button class="avatar-btn">🥷</button>
-                <button class="avatar-btn">🧟</button>
-                <button class="avatar-btn">🧛</button>
-                <button class="avatar-btn">🦄</button>
+            <p>Select your avatar to start: (Use Arrow Keys + Enter)</p>
+            <div class="avatar-selection" id="avatarSelection">
+                <!-- Standard Avatars -->
+                <button class="avatar-btn" data-unlocked="true" data-type="emoji">👽</button>
+                <button class="avatar-btn" data-unlocked="true" data-type="emoji">🤖</button>
+                <button class="avatar-btn" data-unlocked="true" data-type="emoji">👻</button>
+                <button class="avatar-btn" data-unlocked="true" data-type="emoji">🤠</button>
+                <button class="avatar-btn" data-unlocked="true" data-type="emoji">🐱</button>
+                <button class="avatar-btn" data-unlocked="true" data-type="emoji">🧙</button>
+                <button class="avatar-btn" data-unlocked="true" data-type="emoji">🥷</button>
+                <button class="avatar-btn" data-unlocked="true" data-type="emoji">🧟</button>
+                <button class="avatar-btn" data-unlocked="true" data-type="emoji">🧛</button>
+                <button class="avatar-btn" data-unlocked="true" data-type="emoji">🦄</button>
+                
+                <!-- Premium Skins Container (Populated via JS) -->
             </div>
             <div class="controls-info">
                 Use Arrow Keys or WASD to move.<br>
-                Find items (Gun, Staff, Armor) on the ground.<br>
-                Avoid the Spies!
+                Find items to unlock weapons.<br>
+                Survive the escalating spy threat!
             </div>
         </div>
 
@@ -55,34 +57,27 @@
         <div id="shopMenu" class="overlay hidden">
             <h1>UPGRADE SHOP</h1>
             <p>You have $<span id="shopMoney">0</span></p>
-            <div class="shop-options">
-                <button class="shop-btn" id="buyGunBtn">
-                    <span class="shop-icon">🔫</span>
-                    Upgrade Gun ($25)
-                    <br><small>Fire 25% Faster</small>
-                </button>
-                <button class="shop-btn" id="buyStaffBtn">
-                    <span class="shop-icon">🪄</span>
-                    Upgrade Staff ($25)
-                    <br><small>+1 Fireball</small>
-                </button>
-                <button class="shop-btn" id="buyArmorBtn">
-                    <span class="shop-icon">🛡️</span>
-                    Buy Armor ($25)
-                    <br><small>+3 Health</small>
-                </button>
+            
+            <div class="shop-tabs">
+                <button id="tabWeapons" class="tab-btn active">Weapons & Armor</button>
+                <button id="tabSkins" class="tab-btn">Premium Skins</button>
             </div>
+
+            <div id="shopWeapons" class="shop-content active">
+                <div class="shop-grid" id="weaponsGrid">
+                    <!-- Populated via JS -->
+                </div>
+            </div>
+
+            <div id="shopSkins" class="shop-content">
+                <div class="shop-grid" id="skinsGrid">
+                    <!-- Populated via JS -->
+                </div>
+            </div>
+
             <button id="resumeBtn">Resume Game</button>
         </div>
 
-        <!-- Game Over -->
-        <div id="gameOver" class="overlay hidden">
-            <h1>GAME OVER</h1>
-            <p>You were caught by a spy!</p>
-            <p>Time Survived: <span id="finalTime">0</span>s</p>
-            <p>Spies Killed: <span id="finalKills">0</span></p>
-            <button id="restartBtn">Play Again</button>
-        </div>
     </div>
     
     <script src="game.js"></script>
