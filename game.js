@@ -655,12 +655,13 @@ function update(dt) {
 
         if (p.life <= 0) {
             if (p.wType === 'rocket' && p.type !== 'explosion') {
-                enemies.forEach((e, ei) => {
+                for (let j = enemies.length - 1; j >= 0; j--) {
+                    const e = enemies[j];
                     if (Math.hypot(e.x - p.x, e.y - p.y) < p.radius * 5) {
                         e.hp -= p.damage;
-                        if (e.hp <= 0) killEnemy(ei);
+                        if (e.hp <= 0) killEnemy(j);
                     }
-                });
+                }
                 // spawn explosion visual
                 projectiles.push({ type: 'explosion', wType: 'explosion', x: p.x, y: p.y, vx:0, vy:0, radius: p.radius * 5, life: 0.5, maxLife: 0.5, damage: 0 });
             }
@@ -798,25 +799,42 @@ function update(dt) {
         // Lightning
         lvl = player.weapons.lightning;
         if (lvl > 0 && survivalTime - (player.lastShot.lightning || 0) > 3.0 / lvl) {
-            const target = enemies[Math.floor(Math.random() * enemies.length)];
-            target.hp -= 10;
-            if (target.hp <= 0) killEnemy(enemies.indexOf(target));
-            projectiles.push({ type: 'normal', wType: 'lightning', x: target.x, y: target.y, vx:0, vy:0, radius: 20, color: 'yellow', life: 0.3, damage: 0 });
-            player.lastShot.lightning = survivalTime;
+            if (enemies.length > 0) {
+                const target = enemies[Math.floor(Math.random() * enemies.length)];
+                target.hp -= 10;
+                if (target.hp <= 0) killEnemy(enemies.indexOf(target));
+                projectiles.push({ type: 'normal', wType: 'lightning', x: target.x, y: target.y, vx:0, vy:0, radius: 20, color: 'yellow', life: 0.3, damage: 0 });
+                player.lastShot.lightning = survivalTime;
+            }
         }
     }
 
     // Orbs Continuous
     let lvl = player.weapons.orbs;
     if (lvl > 0) {
-        projectiles = projectiles.filter(p => p.wType !== 'orb');
         const numOrbs = lvl + 1;
-        for (let i = 0; i < numOrbs; i++) {
+        let existingOrbs = 0;
+        
+        // Update existing orbs instead of destroying and recreating them (prevents memory leak stutter)
+        for (let i = 0; i < projectiles.length; i++) {
+            if (projectiles[i].wType === 'orb') {
+                const p = projectiles[i];
+                p.angle = (Math.PI * 2 / numOrbs) * existingOrbs + (survivalTime * 2);
+                p.x = player.x + Math.cos(p.angle) * p.distance;
+                p.y = player.y + Math.sin(p.angle) * p.distance;
+                p.life = 100; // Keep alive indefinitely while weapon is owned
+                existingOrbs++;
+            }
+        }
+        
+        // Push new orbs if we leveled up
+        while (existingOrbs < numOrbs) {
             projectiles.push({
                 type: 'normal', wType: 'orb', x: player.x, y: player.y, vx: 0, vy: 0,
                 radius: 12, color: '#aa00ff', life: 100, pierce: true, damage: 0.5,
-                angle: (Math.PI * 2 / numOrbs) * i + (survivalTime * 2), distance: 80, speed: 2
+                angle: (Math.PI * 2 / numOrbs) * existingOrbs + (survivalTime * 2), distance: 80, speed: 2
             });
+            existingOrbs++;
         }
     }
 }
