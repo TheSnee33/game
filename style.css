@@ -16,7 +16,7 @@ body {
     background-color: var(--bg-color);
     color: var(--text-color);
     font-family: 'Outfit', sans-serif;
-    overflow: hidden; /* Prevent scrolling */
+    overflow: hidden;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -54,6 +54,46 @@ canvas {
     z-index: 10;
 }
 
+#top-left-hud > div {
+    margin-bottom: 10px;
+}
+
+#top-right-hud {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+}
+
+#currencyDisplay {
+    font-size: 24px;
+    color: #00ff00;
+    margin-bottom: 10px;
+}
+
+#healthBarContainer {
+    width: 200px;
+    height: 25px;
+    background-color: #333;
+    border: 2px solid #fff;
+    position: relative;
+}
+
+#healthBarFill {
+    width: 100%;
+    height: 100%;
+    background-color: #ff0000;
+    transition: width 0.2s ease;
+}
+
+#healthText {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 12px;
+    color: white;
+}
+
 .overlay {
     position: absolute;
     top: 0;
@@ -87,25 +127,21 @@ canvas {
 
 .avatar-selection {
     display: flex;
-    gap: 30px;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 800px;
+    gap: 15px;
     margin-bottom: 40px;
 }
 
 .avatar-btn {
     background: transparent;
     border: 2px solid var(--secondary-color);
-    color: var(--text-color);
-    padding: 20px;
+    font-size: 3rem;
+    padding: 10px;
     border-radius: 10px;
     cursor: pointer;
-    font-family: 'Outfit', sans-serif;
-    font-size: 1.2rem;
-    font-weight: bold;
     transition: all 0.3s ease;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    min-width: 150px;
 }
 
 .avatar-btn:hover {
@@ -114,8 +150,35 @@ canvas {
     box-shadow: 0 5px 15px rgba(0, 240, 255, 0.4);
 }
 
-.avatar-icon {
-    font-size: 4rem;
+.shop-options {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.shop-btn {
+    background: rgba(0, 0, 0, 0.6);
+    border: 2px solid #00f0ff;
+    color: white;
+    padding: 20px;
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.2rem;
+    font-weight: bold;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.shop-btn:hover {
+    background: rgba(0, 240, 255, 0.2);
+    transform: scale(1.05);
+}
+
+.shop-icon {
+    font-size: 3rem;
     margin-bottom: 10px;
 }
 
@@ -128,7 +191,7 @@ canvas {
     border-radius: 8px;
 }
 
-#restartBtn {
+#restartBtn, #resumeBtn {
     background: var(--primary-color);
     color: white;
     border: none;
@@ -141,7 +204,7 @@ canvas {
     margin-top: 20px;
 }
 
-#restartBtn:hover {
+#restartBtn:hover, #resumeBtn:hover {
     background: #ff3399;
     transform: scale(1.05);
 }

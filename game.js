@@ -4,24 +4,40 @@ const ctx = canvas.getContext('2d');
 // UI Elements
 const mainMenu = document.getElementById('mainMenu');
 const gameOverScreen = document.getElementById('gameOver');
+const shopMenu = document.getElementById('shopMenu');
 const hud = document.getElementById('hud');
+
+const killsDisplay = document.getElementById('killsDisplay');
 const timeSurvivedEl = document.getElementById('timeSurvived');
-const currentItemEl = document.getElementById('currentItem');
+const currentWeaponsEl = document.getElementById('currentWeapons');
+const moneyDisplay = document.getElementById('moneyDisplay');
+const healthBarFill = document.getElementById('healthBarFill');
+const healthText = document.getElementById('healthText');
+
+const shopMoneyEl = document.getElementById('shopMoney');
 const finalTimeEl = document.getElementById('finalTime');
+const finalKillsEl = document.getElementById('finalKills');
+
 const avatarBtns = document.querySelectorAll('.avatar-btn');
 const restartBtn = document.getElementById('restartBtn');
+const resumeBtn = document.getElementById('resumeBtn');
+
+const buyGunBtn = document.getElementById('buyGunBtn');
+const buyStaffBtn = document.getElementById('buyStaffBtn');
+const buyArmorBtn = document.getElementById('buyArmorBtn');
 
 // Game State
 let isPlaying = false;
+let isShopOpen = false;
 let lastTime = 0;
-let timeScale = 0.1; // Slow motion by default
-let survivalTime = 0; // In seconds
+let timeScale = 0.1; 
+let survivalTime = 0; 
 let distanceMoved = 0;
 let avatarChoice = '👽';
+let lastShopKillCount = 0;
 
 // Input
 const keys = {};
-
 window.addEventListener('keydown', (e) => { keys[e.key] = true; });
 window.addEventListener('keyup', (e) => { keys[e.key] = false; });
 window.addEventListener('resize', resizeCanvas);
@@ -34,38 +50,42 @@ resizeCanvas();
 
 // --- Game Objects ---
 
-const player = {
-    x: canvas.width / 2,
-    y: canvas.height / 2,
-    radius: 20,
-    speed: 300, // pixels per second
-    color: '#00f0ff',
-    item: null, // 'Clock', 'Gun', 'Staff'
-    lastShotTime: 0
-};
-
+let player = {};
 let enemies = [];
 let items = [];
 let projectiles = [];
 
 const ITEM_TYPES = [
-    { name: 'Clock', icon: '⏱️', color: '#ffea00' },
-    { name: 'Gun', icon: '🔫', color: '#a0a0a0' },
-    { name: 'Staff', icon: '🪄', color: '#b500ff' }
+    { name: 'Gun', icon: '🔫', color: '#ffff00' },
+    { name: 'Staff', icon: '🪄', color: '#ff00ff' },
+    { name: 'Armor', icon: '🛡️', color: '#00ff00' }
 ];
 
 // --- Core Functions ---
 
 function startGame(avatar) {
-    avatarChoice = avatar;
+    avatarChoice = avatar || avatarChoice;
     isPlaying = true;
+    isShopOpen = false;
     survivalTime = 0;
     distanceMoved = 0;
+    lastShopKillCount = 0;
     
-    player.x = canvas.width / 2;
-    player.y = canvas.height / 2;
-    player.item = null;
-    player.lastShotTime = 0;
+    player = {
+        x: canvas.width / 2,
+        y: canvas.height / 2,
+        radius: 20,
+        speed: 300,
+        color: '#00f0ff',
+        hp: 1,
+        money: 0,
+        kills: 0,
+        gunLevel: 0,
+        staffLevel: 0,
+        lastGunShot: 0,
+        lastStaffShot: 0,
+        invincibility: 0
+    };
     
     enemies = [];
     items = [];
@@ -73,7 +93,10 @@ function startGame(avatar) {
     
     mainMenu.classList.add('hidden');
     gameOverScreen.classList.add('hidden');
+    shopMenu.classList.add('hidden');
     hud.classList.remove('hidden');
+    
+    updateHUD();
     
     lastTime = performance.now();
     requestAnimationFrame(gameLoop);
@@ -84,26 +107,81 @@ function endGame() {
     hud.classList.add('hidden');
     gameOverScreen.classList.remove('hidden');
     finalTimeEl.innerText = Math.floor(survivalTime);
+    finalKillsEl.innerText = player.kills;
 }
 
-// Avatar selection
+function openShop() {
+    isShopOpen = true;
+    shopMoneyEl.innerText = player.money;
+    shopMenu.classList.remove('hidden');
+}
+
+function closeShop() {
+    isShopOpen = false;
+    shopMenu.classList.add('hidden');
+    lastTime = performance.now(); // Reset time so we don't jump
+    requestAnimationFrame(gameLoop);
+}
+
+// UI Listeners
 avatarBtns.forEach(btn => {
     btn.addEventListener('click', () => {
-        const avatar = btn.querySelector('.avatar-icon').innerText;
-        startGame(avatar);
+        startGame(btn.innerText);
     });
 });
 
-restartBtn.addEventListener('click', () => {
-    startGame(avatarChoice);
+restartBtn.addEventListener('click', () => startGame());
+resumeBtn.addEventListener('click', closeShop);
+
+buyGunBtn.addEventListener('click', () => {
+    if (player.money >= 25) {
+        player.money -= 25;
+        player.gunLevel++;
+        shopMoneyEl.innerText = player.money;
+        updateHUD();
+    }
 });
+
+buyStaffBtn.addEventListener('click', () => {
+    if (player.money >= 25) {
+        player.money -= 25;
+        player.staffLevel++;
+        shopMoneyEl.innerText = player.money;
+        updateHUD();
+    }
+});
+
+buyArmorBtn.addEventListener('click', () => {
+    if (player.money >= 25) {
+        player.money -= 25;
+        player.hp += 3;
+        shopMoneyEl.innerText = player.money;
+        updateHUD();
+    }
+});
+
+function updateHUD() {
+    killsDisplay.innerText = player.kills;
+    timeSurvivedEl.innerText = Math.floor(survivalTime);
+    moneyDisplay.innerText = player.money;
+    
+    healthText.innerText = player.hp + " HP";
+    const hpPercent = Math.min(100, (player.hp / 10) * 100);
+    healthBarFill.style.width = hpPercent + "%";
+
+    let weapons = [];
+    if (player.gunLevel > 0) weapons.push(`Gun (Lv.${player.gunLevel})`);
+    if (player.staffLevel > 0) weapons.push(`Staff (Lv.${player.staffLevel})`);
+    currentWeaponsEl.innerText = weapons.length > 0 ? weapons.join(", ") : "None";
+}
 
 // --- Game Loop ---
 
 function gameLoop(currentTime) {
     if (!isPlaying) return;
+    if (isShopOpen) return;
 
-    const dt = (currentTime - lastTime) / 1000; // Delta time in seconds
+    const dt = (currentTime - lastTime) / 1000; 
     lastTime = currentTime;
 
     update(dt);
@@ -123,32 +201,30 @@ function update(dt) {
     if (keys['ArrowLeft'] || keys['a'] || keys['A']) { dx -= 1; isMoving = true; }
     if (keys['ArrowRight'] || keys['d'] || keys['D']) { dx += 1; isMoving = true; }
 
-    timeScale = isMoving ? 1.0 : 0.1; // Normal speed when moving, slow otherwise
+    timeScale = isMoving ? 1.0 : 0.1; 
 
     survivalTime += dt * timeScale;
-    timeSurvivedEl.innerText = Math.floor(survivalTime);
+    if (player.invincibility > 0) {
+        player.invincibility -= dt * timeScale;
+    }
 
     // 2. Move Player
     if (isMoving) {
-        // Normalize
         const length = Math.sqrt(dx*dx + dy*dy);
         if (length > 0) {
             dx /= length;
             dy /= length;
         }
 
-        const moveAmount = player.speed * dt; // Player moves in real-time, unaffected by slow-mo
+        const moveAmount = player.speed * dt;
         player.x += dx * moveAmount;
         player.y += dy * moveAmount;
-        
         distanceMoved += moveAmount;
 
-        // Keep player in bounds
         player.x = Math.max(player.radius, Math.min(canvas.width - player.radius, player.x));
         player.y = Math.max(player.radius, Math.min(canvas.height - player.radius, player.y));
 
-        // 50/50 Item Spawn Logic based on movement
-        if (distanceMoved > 200) { // Every 200 pixels moved
+        if (distanceMoved > 250) { 
             distanceMoved = 0;
             if (Math.random() > 0.5) {
                 spawnItem();
@@ -157,15 +233,12 @@ function update(dt) {
     }
 
     // 3. Update Enemies
-    // Spawn enemies occasionally
-    if (Math.random() < 0.02 * timeScale) {
+    if (Math.random() < 0.03 * timeScale) {
         spawnEnemy();
     }
 
     for (let i = enemies.length - 1; i >= 0; i--) {
         const enemy = enemies[i];
-        
-        // Move towards player
         const edx = player.x - enemy.x;
         const edy = player.y - enemy.y;
         const dist = Math.sqrt(edx*edx + edy*edy);
@@ -176,13 +249,19 @@ function update(dt) {
         }
 
         // Collision with player
-        if (dist < player.radius + enemy.radius) {
-            endGame();
-            return;
+        if (dist < player.radius + enemy.radius && player.invincibility <= 0) {
+            player.hp -= 1;
+            player.invincibility = 1.0; // 1 second i-frames
+            updateHUD();
+            
+            if (player.hp <= 0) {
+                endGame();
+                return;
+            }
         }
     }
 
-    // 4. Update Projectiles
+    // 4. Update Projectiles & Enemy Kills
     for (let i = projectiles.length - 1; i >= 0; i--) {
         const p = projectiles[i];
         p.x += p.vx * dt * timeScale;
@@ -194,14 +273,15 @@ function update(dt) {
             continue;
         }
 
-        // Collision with enemies
         for (let j = enemies.length - 1; j >= 0; j--) {
             const e = enemies[j];
             const dist = Math.hypot(p.x - e.x, p.y - e.y);
             if (dist < p.radius + e.radius) {
-                // Hit!
                 enemies.splice(j, 1);
-                // Staff pierces, Gun does not
+                
+                player.kills++;
+                player.money++;
+                
                 if (!p.pierce) {
                     projectiles.splice(i, 1);
                     break;
@@ -210,7 +290,13 @@ function update(dt) {
         }
     }
 
-    // 5. Update Items & Collision
+    // 5. Check Shop Trigger
+    if (player.kills > 0 && player.kills % 25 === 0 && player.kills !== lastShopKillCount) {
+        lastShopKillCount = player.kills;
+        openShop();
+    }
+
+    // 6. Update Items & Collision
     for (let i = items.length - 1; i >= 0; i--) {
         const item = items[i];
         item.life -= dt * timeScale;
@@ -222,59 +308,63 @@ function update(dt) {
 
         const dist = Math.hypot(player.x - item.x, player.y - item.y);
         if (dist < player.radius + item.radius) {
-            // Pick up item
-            if (item.type.name === 'Clock') {
-                survivalTime += 10; // Bonus time
-            } else {
-                player.item = item.type.name;
-                currentItemEl.innerText = item.type.name;
+            if (item.type.name === 'Gun') {
+                player.gunLevel++;
+            } else if (item.type.name === 'Staff') {
+                player.staffLevel++;
+            } else if (item.type.name === 'Armor') {
+                player.hp += 3;
             }
             items.splice(i, 1);
         }
     }
 
-    // 6. Combat / Weapons Logic
-    if (player.item === 'Gun' || player.item === 'Staff') {
-        const fireRate = player.item === 'Gun' ? 0.5 : 1.5; // seconds between shots
-        if (survivalTime - player.lastShotTime > fireRate) {
-            fireWeapon();
-            player.lastShotTime = survivalTime;
+    // 7. Auto-fire Weapons
+    if (enemies.length > 0) {
+        // Find nearest
+        let nearest = enemies[0];
+        let minDist = Math.hypot(player.x - nearest.x, player.y - nearest.y);
+        for (let i = 1; i < enemies.length; i++) {
+            const d = Math.hypot(player.x - enemies[i].x, player.y - enemies[i].y);
+            if (d < minDist) { minDist = d; nearest = enemies[i]; }
+        }
+
+        const angleToNearest = Math.atan2(nearest.y - player.y, nearest.x - player.x);
+
+        // Fire Gun
+        if (player.gunLevel > 0) {
+            const fireRate = 0.5 / (1 + 0.25 * (player.gunLevel - 1));
+            if (survivalTime - player.lastGunShot > fireRate) {
+                projectiles.push({
+                    x: player.x, y: player.y,
+                    vx: Math.cos(angleToNearest) * 800, vy: Math.sin(angleToNearest) * 800,
+                    radius: 5, color: '#ffff00', life: 2, pierce: false
+                });
+                player.lastGunShot = survivalTime;
+            }
+        }
+
+        // Fire Staff
+        if (player.staffLevel > 0) {
+            if (survivalTime - player.lastStaffShot > 1.5) {
+                const numProjectiles = player.staffLevel;
+                const spreadAngle = 0.4; // Radians
+                const startAngle = angleToNearest - (spreadAngle * (numProjectiles - 1)) / 2;
+
+                for (let i = 0; i < numProjectiles; i++) {
+                    const angle = startAngle + i * spreadAngle;
+                    projectiles.push({
+                        x: player.x, y: player.y,
+                        vx: Math.cos(angle) * 400, vy: Math.sin(angle) * 400,
+                        radius: 15, color: '#ff00ff', life: 3, pierce: true
+                    });
+                }
+                player.lastStaffShot = survivalTime;
+            }
         }
     }
-}
 
-function fireWeapon() {
-    // Find nearest enemy
-    if (enemies.length === 0) return;
-    
-    let nearest = enemies[0];
-    let minDist = Math.hypot(player.x - nearest.x, player.y - nearest.y);
-    
-    for (let i = 1; i < enemies.length; i++) {
-        const dist = Math.hypot(player.x - enemies[i].x, player.y - enemies[i].y);
-        if (dist < minDist) {
-            minDist = dist;
-            nearest = enemies[i];
-        }
-    }
-
-    const dx = nearest.x - player.x;
-    const dy = nearest.y - player.y;
-    const length = Math.hypot(dx, dy);
-
-    if (player.item === 'Gun') {
-        projectiles.push({
-            x: player.x, y: player.y,
-            vx: (dx/length) * 800, vy: (dy/length) * 800,
-            radius: 5, color: '#ffff00', life: 2, pierce: false
-        });
-    } else if (player.item === 'Staff') {
-        projectiles.push({
-            x: player.x, y: player.y,
-            vx: (dx/length) * 400, vy: (dy/length) * 400,
-            radius: 15, color: '#ff5500', life: 3, pierce: true
-        });
-    }
+    updateHUD();
 }
 
 function spawnEnemy() {
@@ -303,18 +393,16 @@ function spawnItem() {
         y: Math.random() * (canvas.height - 100) + 50,
         radius: 15,
         type: type,
-        life: 10 // seconds before it disappears
+        life: 15 
     });
 }
 
 // --- Drawing ---
 
 function draw() {
-    // Background
     ctx.fillStyle = '#0d1117';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Draw Grid (Vibrant)
     ctx.strokeStyle = 'rgba(0, 240, 255, 0.1)';
     ctx.lineWidth = 1;
     const gridSize = 50;
@@ -325,20 +413,16 @@ function draw() {
         ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
     }
 
-    // Draw Items
     items.forEach(item => {
         ctx.font = "24px Arial";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        
-        // Glow
         ctx.shadowBlur = 10;
         ctx.shadowColor = item.type.color;
         ctx.fillText(item.type.icon, item.x, item.y);
-        ctx.shadowBlur = 0; // reset
+        ctx.shadowBlur = 0; 
     });
 
-    // Draw Projectiles
     projectiles.forEach(p => {
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
@@ -349,7 +433,6 @@ function draw() {
         ctx.shadowBlur = 0;
     });
 
-    // Draw Enemies
     enemies.forEach(enemy => {
         ctx.font = "28px Arial";
         ctx.textAlign = "center";
@@ -358,15 +441,15 @@ function draw() {
     });
 
     // Draw Player
-    ctx.font = "32px Arial";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    
-    // Player glow depending on time scale
-    if (timeScale > 0.5) {
-        ctx.shadowBlur = 15;
-        ctx.shadowColor = '#00f0ff';
+    if (player.invincibility <= 0 || Math.floor(survivalTime * 10) % 2 === 0) {
+        ctx.font = "32px Arial";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        if (timeScale > 0.5) {
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#00f0ff';
+        }
+        ctx.fillText(avatarChoice, player.x, player.y);
+        ctx.shadowBlur = 0;
     }
-    ctx.fillText(avatarChoice, player.x, player.y);
-    ctx.shadowBlur = 0;
 }

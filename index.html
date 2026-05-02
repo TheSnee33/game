@@ -13,8 +13,18 @@
         
         <!-- UI Overlay -->
         <div id="hud" class="hidden">
-            <div id="scoreDisplay">Time Survived: <span id="timeSurvived">0</span>s</div>
-            <div id="itemDisplay">Current Item: <span id="currentItem">None</span></div>
+            <div id="top-left-hud">
+                <div id="scoreDisplay">Kills: <span id="killsDisplay">0</span></div>
+                <div id="timeDisplay">Time: <span id="timeSurvived">0</span>s</div>
+                <div id="itemDisplay">Current Weapons: <span id="currentWeapons">None</span></div>
+            </div>
+            <div id="top-right-hud">
+                <div id="currencyDisplay">$<span id="moneyDisplay">0</span></div>
+                <div id="healthBarContainer">
+                    <div id="healthBarFill"></div>
+                    <span id="healthText">1 HP</span>
+                </div>
+            </div>
         </div>
 
         <!-- Main Menu -->
@@ -23,20 +33,46 @@
             <p>Time moves slowly when you stand still...</p>
             <p>Select your avatar to start:</p>
             <div class="avatar-selection">
-                <button class="avatar-btn" data-avatar="1">
-                    <div class="avatar-icon avatar-1">👽</div>
-                    Alien
-                </button>
-                <button class="avatar-btn" data-avatar="2">
-                    <div class="avatar-icon avatar-2">🤖</div>
-                    Robot
-                </button>
+                <button class="avatar-btn">👽</button>
+                <button class="avatar-btn">🤖</button>
+                <button class="avatar-btn">👻</button>
+                <button class="avatar-btn">🤠</button>
+                <button class="avatar-btn">🐱</button>
+                <button class="avatar-btn">🧙</button>
+                <button class="avatar-btn">🥷</button>
+                <button class="avatar-btn">🧟</button>
+                <button class="avatar-btn">🧛</button>
+                <button class="avatar-btn">🦄</button>
             </div>
             <div class="controls-info">
                 Use Arrow Keys or WASD to move.<br>
-                Move to find items (Clock, Gun, Staff).<br>
+                Find items (Gun, Staff, Armor) on the ground.<br>
                 Avoid the Spies!
             </div>
+        </div>
+
+        <!-- Shop Menu -->
+        <div id="shopMenu" class="overlay hidden">
+            <h1>UPGRADE SHOP</h1>
+            <p>You have $<span id="shopMoney">0</span></p>
+            <div class="shop-options">
+                <button class="shop-btn" id="buyGunBtn">
+                    <span class="shop-icon">🔫</span>
+                    Upgrade Gun ($25)
+                    <br><small>Fire 25% Faster</small>
+                </button>
+                <button class="shop-btn" id="buyStaffBtn">
+                    <span class="shop-icon">🪄</span>
+                    Upgrade Staff ($25)
+                    <br><small>+1 Fireball</small>
+                </button>
+                <button class="shop-btn" id="buyArmorBtn">
+                    <span class="shop-icon">🛡️</span>
+                    Buy Armor ($25)
+                    <br><small>+3 Health</small>
+                </button>
+            </div>
+            <button id="resumeBtn">Resume Game</button>
         </div>
 
         <!-- Game Over -->
@@ -44,6 +80,7 @@
             <h1>GAME OVER</h1>
             <p>You were caught by a spy!</p>
             <p>Time Survived: <span id="finalTime">0</span>s</p>
+            <p>Spies Killed: <span id="finalKills">0</span></p>
             <button id="restartBtn">Play Again</button>
         </div>
     </div>
