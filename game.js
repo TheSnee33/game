@@ -324,6 +324,7 @@ function startGame() {
 
     let initialWeapons = {};
     WEAPONS.forEach(w => initialWeapons[w.id] = 0);
+    initialWeapons['gun'] = 1; // Every avatar starts with a basic pistol to defend themselves
     
     // Completely isolated fresh player state to prevent any 'spreading' of skills from death
     player = {
